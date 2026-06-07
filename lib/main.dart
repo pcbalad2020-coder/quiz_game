@@ -1767,7 +1767,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
                       fontSize: 22,
                       fontWeight: FontWeight.bold)),
               SizedBox(height: 4),
-              Text('آخر تحديث: يناير 2025',
+              Text('آخر تحديث: يناير 2026',
                   style: TextStyle(color: Colors.white70, fontSize: 12)),
             ]),
           ),
@@ -1826,15 +1826,15 @@ class PrivacyPolicyScreen extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-                color: AppColors.primaryDark.withOpacity(0.08),
+                color: AppColors.primaryDark.withOpacity(0.30),
                 borderRadius: BorderRadius.circular(14),
                 border:
-                    Border.all(color: AppColors.primaryDark.withOpacity(0.25))),
+                    Border.all(color: AppColors.primaryDark.withOpacity(0.50))),
             child: const Text(
                 'باستخدامك للتطبيق فأنت توافق على هذه السياسة. '
                 'إن لم تكن موافقاً يرجى التوقف عن الاستخدام.',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 12, height: 1.6)),
+                style: TextStyle(fontSize: 14, height: 1.6)),
           ),
           const SizedBox(height: 30),
         ]),

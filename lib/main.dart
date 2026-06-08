@@ -1,13 +1,6 @@
-// ============================================================
-// 🎯 لعبة الأسئلة والأجوبة - Quiz Game
-// الملف: main.dart  — منطق التطبيق وواجهاته فقط
-// بيانات الأسئلة محفوظة في: quiz_data.dart
-// ============================================================
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
 // استيراد ملف الأسئلة والنماذج
 import 'quiz_data.dart';
 
@@ -822,7 +815,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             const Text('لعبة الأسئلة',
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 6),
-            const Text('الإصدار 2.0.0', style: TextStyle(fontSize: 13)),
+            const Text('الإصدار 1.0.0', style: TextStyle(fontSize: 13)),
             const SizedBox(height: 10),
             Container(
               padding: const EdgeInsets.all(12),

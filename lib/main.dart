@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 // استيراد ملف الأسئلة والنماذج
 import 'quiz_data.dart';
+import 'ad_manager.dart';
 
 // ============================================================
 // 🚀 نقطة الدخول الرئيسية
@@ -19,6 +21,8 @@ void main() async {
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.light,
   ));
+  // تهيئة إعلانات AdMob
+  await MobileAds.instance.initialize();
   runApp(const QuizApp());
 }
 
@@ -163,14 +167,17 @@ class GameState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// يحدد المرحلة الحالية للمرحلة التالية فقط إن كانت مفتوحة فعلياً
+  /// (تصحيح: سابقاً كانت تنتقل للمرحلة التالية دون أي فحص لحالة القفل،
+  /// مما يسمح بتجاوز نظام النقاط المطلوبة لو أنهى اللاعب مرحلة بنتيجة 0).
   void markLevelCompleted(int levelId) {
     if (!_completedLevels.contains(levelId)) {
       _completedLevels.add(levelId);
       GameStorage.saveCompletedLevels(_completedLevels);
     }
-    // اجعل المرحلة التالية هي الحالية إن وُجدت
+    // اجعل المرحلة التالية هي الحالية فقط إن وُجدت وكانت مفتوحة
     final nextId = levelId + 1;
-    if (nextId <= QuizData.levels.length) {
+    if (nextId <= QuizData.levels.length && isLevelUnlocked(nextId)) {
       setCurrentLevel(nextId);
     }
     notifyListeners();
@@ -300,8 +307,11 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   void initState() {
     super.initState();
+    // تهيئة مسبقة للإعلان البيني ليكون جاهزاً عند نهاية أول مرحلة
+    AdManager.instance.loadInterstitial();
     _scaleCtrl.forward();
     Future.delayed(const Duration(milliseconds: 200), () {
+      if (!mounted) return;
       _fadeCtrl.forward();
       _rotCtrl.forward();
     });
@@ -379,12 +389,13 @@ class _SplashScreenState extends State<SplashScreen>
                           fontWeight: FontWeight.bold,
                           letterSpacing: 1.5)),
                   const SizedBox(height: 6),
-                  Text('اختبر معلوماتك في 10 مراحل',
+                  Text('اختبر معلوماتك في ${QuizData.levels.length} مراحل',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                           color: Colors.white.withOpacity(0.8), fontSize: 15)),
                   const SizedBox(height: 6),
-                  Text('150 سؤالاً متنوعاً',
+                  Text(
+                      '${QuizData.levels.fold(0, (s, l) => s + l.questions.length)} سؤالاً متنوعاً',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                           color: Colors.white.withOpacity(0.65), fontSize: 13)),
@@ -445,17 +456,34 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   late final Animation<double> _cardsFade = Tween<double>(begin: 0.0, end: 1.0)
       .animate(CurvedAnimation(parent: _cardsCtrl, curve: Curves.easeIn));
 
+  // ── إعلان البانر في الشاشة الرئيسية ──
+  BannerAd? _bannerAd;
+  bool _bannerReady = false;
+
   @override
   void initState() {
     super.initState();
     _headerCtrl.forward();
-    Future.delayed(const Duration(milliseconds: 300), _cardsCtrl.forward);
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (!mounted) return;
+      _cardsCtrl.forward();
+    });
+    _loadBanner();
+  }
+
+  void _loadBanner() {
+    _bannerAd = AdManager.instance.createBannerAd(
+      onLoaded: () {
+        if (mounted) setState(() => _bannerReady = true);
+      },
+    )..load();
   }
 
   @override
   void dispose() {
     _headerCtrl.dispose();
     _cardsCtrl.dispose();
+    _bannerAd?.dispose();
     super.dispose();
   }
 
@@ -515,7 +543,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       icon: Icons.grid_view_rounded,
                       title: 'اختيار المرحلة',
                       subtitle:
-                          '${widget.gameState.unlockedLevels.length} مراحل مفتوحة من 10',
+                          '${widget.gameState.unlockedLevels.length} مراحل مفتوحة من ${QuizData.levels.length}',
                       gradient: LinearGradient(colors: [
                         AppColors.secondaryDark,
                         AppColors.secondaryDark.withOpacity(0.7)
@@ -556,6 +584,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     ]),
                   ]),
                 ),
+
+                // ─── إعلان البانر (يظهر فقط بعد التحميل بنجاح) ───
+                if (_bannerReady && _bannerAd != null) ...[
+                  const SizedBox(height: 18),
+                  Container(
+                    alignment: Alignment.center,
+                    width: _bannerAd!.size.width.toDouble(),
+                    height: _bannerAd!.size.height.toDouble(),
+                    child: AdWidget(ad: _bannerAd!),
+                  ),
+                ],
               ],
             ),
           ),
@@ -619,9 +658,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             _scoreStat(
                 '📊', 'المرحلة الحالية', '${widget.gameState.currentLevel}'),
             _scoreStat('🔓', 'مراحل مفتوحة',
-                '${widget.gameState.unlockedLevels.length}/10'),
+                '${widget.gameState.unlockedLevels.length}/${QuizData.levels.length}'),
             _scoreStat('✅', 'مراحل مكتملة',
-                '${widget.gameState.completedLevels.length}/10'),
+                '${widget.gameState.completedLevels.length}/${QuizData.levels.length}'),
           ]),
         ]),
       );
@@ -642,10 +681,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   // ── إحصاء سريع ──
   Widget _buildQuickStats() {
     final total = QuizData.levels.fold(0, (s, l) => s + l.questions.length);
+    // تصحيح: استخدام بحث آمن (يتجاهل أي id غير موجود بدل افتراض المرحلة 1)
     final answered = widget.gameState.completedLevels.fold(0, (s, id) {
-      final lvl = QuizData.levels
-          .firstWhere((l) => l.id == id, orElse: () => QuizData.levels.first);
-      return s + lvl.questions.length;
+      for (final lvl in QuizData.levels) {
+        if (lvl.id == id) return s + lvl.questions.length;
+      }
+      return s;
     });
     final pct = total == 0 ? 0.0 : answered / total;
 
@@ -815,17 +856,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             const Text('لعبة الأسئلة',
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 6),
-            const Text('الإصدار 1.0.0', style: TextStyle(fontSize: 13)),
+            const Text('الإصدار 1.1.0', style: TextStyle(fontSize: 13)),
             const SizedBox(height: 10),
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                   color: AppColors.primaryDark.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12)),
-              child: const Text(
-                  '10 مراحل • 150 سؤالاً متنوعاً\nعلوم • جغرافيا • تاريخ • تقنية\nرياضة • طبيعة • فضاء • فن • طب • تحدي',
+              child: Text(
+                  '${QuizData.levels.length} مراحل • ${QuizData.levels.fold(0, (s, l) => s + l.questions.length)} سؤالاً متنوعاً\nعلوم • جغرافيا • تاريخ • تقنية\nرياضة • طبيعة • فضاء • فن • طب • دين • ألغاز • أعلام',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 12, height: 1.6)),
+                  style: const TextStyle(fontSize: 12, height: 1.6)),
             ),
           ]),
           actions: [
@@ -1044,7 +1085,10 @@ class ProgressScreen extends StatelessWidget {
           ...QuizData.levels.map((lvl) {
             final unlocked = gameState.isLevelUnlocked(lvl.id);
             final completed = gameState.isLevelCompleted(lvl.id);
-            final progress = completed ? 1.0 : (unlocked ? 0.0 : 0.0);
+            // تصحيح: شريط التقدم كان يعرض 0% دائماً للمراحل غير المكتملة
+            // (سواء كانت مفتوحة أو مقفلة). الآن: 1.0 لو مكتملة، 0.0 لو غير ذلك،
+            // مع وضوح أكبر بأن "غير مكتملة" تشمل الحالتين فعلاً.
+            final progress = completed ? 1.0 : 0.0;
 
             return Container(
               margin: const EdgeInsets.only(bottom: 10),
@@ -1166,6 +1210,10 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   int _levelScore = 0;
   int? _selected;
   bool _answered = false;
+  // تصحيح: حارس يمنع استدعاء _showComplete أو الانتقال للسؤال التالي
+  // بعد أن تكون الشاشة قد أُزيلت (dispose) — يحدث لو المستخدم رجع للخلف
+  // بسرعة قبل انتهاء الـ Future.delayed.
+  bool _isDisposed = false;
 
   late final AnimationController _qCtrl = AnimationController(
       vsync: this, duration: const Duration(milliseconds: 450));
@@ -1195,13 +1243,15 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   }
 
   void _onTimerDone(AnimationStatus s) {
-    if (s == AnimationStatus.completed && !_answered) {
+    // تصحيح: فحص mounted/_isDisposed لتجنّب استدعاء setState بعد إزالة الشاشة
+    if (s == AnimationStatus.completed && !_answered && mounted) {
       _selectAnswer(-1); // انتهى الوقت
     }
   }
 
   @override
   void dispose() {
+    _isDisposed = true;
     _qCtrl.dispose();
     _resCtrl.dispose();
     _timerCtrl.dispose();
@@ -1212,7 +1262,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   int get _total => widget.level.questions.length;
 
   void _selectAnswer(int idx) {
-    if (_answered) return;
+    if (_answered || _isDisposed) return;
     _timerCtrl.stop();
     setState(() {
       _selected = idx;
@@ -1226,6 +1276,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
     }
 
     Future.delayed(const Duration(milliseconds: 1900), () {
+      // تصحيح: فحص mounted قبل أي استدعاء setState/Navigator بعد التأخير
       if (!mounted) return;
       if (_qIdx < _total - 1) {
         _nextQuestion();
@@ -1249,6 +1300,14 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
 
   void _showComplete() {
     widget.gameState.markLevelCompleted(widget.level.id);
+    // عرض الإعلان البيني (إن كان جاهزاً) قبل حوار انتهاء المرحلة
+    AdManager.instance.showInterstitial(onDismissed: () {
+      if (!mounted) return;
+      _openCompleteDialog();
+    });
+  }
+
+  void _openCompleteDialog() {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -1760,7 +1819,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
                       fontSize: 22,
                       fontWeight: FontWeight.bold)),
               SizedBox(height: 4),
-              Text('آخر تحديث: يناير 2026',
+              Text('آخر تحديث: يوليو 2026',
                   style: TextStyle(color: Colors.white70, fontSize: 12)),
             ]),
           ),
@@ -1787,30 +1846,37 @@ class PrivacyPolicyScreen extends StatelessWidget {
                   'لا تُشارك هذه البيانات مع أي طرف ثالث إطلاقاً.'),
 
           _section(
-              '4. أمان البيانات',
-              'جميع البيانات محفوظة على جهازك فقط باستخدام SharedPreferences. '
-                  'لا يُرسَل أي شيء إلى خوادم خارجية. '
-                  'يمكنك حذف جميع بياناتك في أي وقت عبر "إعادة ضبط" في الشاشة الرئيسية.'),
+              '4. الإعلانات',
+              'يستخدم التطبيق خدمة إعلانات Google AdMob لعرض إعلانات (بانر وإعلانات بينية) '
+                  'داخل التطبيق لدعم استمراريته مجاناً. قد تقوم Google بجمع معرّف الجهاز '
+                  'الإعلاني ومعلومات تقنية أخرى وفق سياسة خصوصية Google الخاصة بالإعلانات، '
+                  'والتي يمكنك مراجعتها والتحكم بتفضيلاتها عبر إعدادات جهازك.'),
 
           _section(
-              '5. حقوقك',
+              '5. أمان البيانات',
+              'بيانات تقدمك محفوظة على جهازك فقط باستخدام SharedPreferences ولا يُرسَل '
+                  'أي شيء منها إلى خوادمنا. يمكنك حذف جميع بياناتك في أي وقت عبر "إعادة ضبط" '
+                  'في الشاشة الرئيسية.'),
+
+          _section(
+              '6. حقوقك',
               'لديك الحق الكامل في:\n\n'
                   '• الاطلاع على بياناتك المحفوظة\n'
                   '• حذفها في أي وقت تشاء\n'
                   '• إيقاف استخدام التطبيق'),
 
           _section(
-              '6. الأطفال',
+              '7. الأطفال',
               'تطبيقنا مناسب لجميع الأعمار. لا نجمع أي بيانات خاصة بالأطفال '
-                  'دون موافقة ولي الأمر، إذ لا نجمع بيانات شخصية أصلاً.'),
+                  'دون موافقة ولي الأمر، إذ لا نجمع بيانات شخصية أصلاً بخلاف ما توفره خدمة الإعلانات.'),
 
           _section(
-              '7. التعديلات',
+              '8. التعديلات',
               'قد نحدّث هذه السياسة من وقت لآخر. سيتم إخطارك بأي تغييرات '
                   'جوهرية عند تحديث التطبيق.'),
 
           _section(
-              '8. تواصل معنا',
+              '9. تواصل معنا',
               'لأي استفسار حول سياسة الخصوصية:\n\n'
                   '📧 support@quizgame.app\n'
                   '🌐 www.quizgame.app'),

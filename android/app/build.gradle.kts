@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.quiz_game"
+    namespace = "com.kasem.quiz_game"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 

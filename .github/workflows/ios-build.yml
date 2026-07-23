@@ -1,0 +1,40 @@
+name: "Build IPA for 3uTools"
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          architecture: x64
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      # بناء مشروع iOS بدون توقيع رسمي
+      - name: Build Xcode Project
+        run: flutter build ios --release --no-codesign
+
+      # تجميع الملفات وتحويلها إلى صيغة .ipa صالحة لـ 3uTools
+      - name: Create IPA Package
+        run: |
+          mkdir -p Payload
+          mv build/ios/iphoneos/Runner.app Payload/
+          zip -r app.ipa Payload
+
+      # رفع ملف الـ IPA النهائي (تم إصلاح الاسم هنا)
+      - name: Upload IPA to GitHub
+        uses: actions/upload-artifact@v4
+        with:
+          name: my-flutter-app-ipa
+          path: app.ipa

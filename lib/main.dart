@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:collection/collection.dart';
 // استيراد ملف الأسئلة والنماذج
 import 'quiz_data.dart';
 import 'ad_manager.dart';
@@ -175,11 +176,24 @@ class GameState extends ChangeNotifier {
       _completedLevels.add(levelId);
       GameStorage.saveCompletedLevels(_completedLevels);
     }
-    // اجعل المرحلة التالية هي الحالية فقط إن وُجدت وكانت مفتوحة
-    final nextId = levelId + 1;
-    if (nextId <= QuizData.levels.length && isLevelUnlocked(nextId)) {
-      setCurrentLevel(nextId);
+
+    // 🔑 ابحث عن أول مرحلة مفتوحة وغير مكتملة (المرحلة التالية منطقياً)
+    int? nextOpenUncompleted;
+    for (final lvl in QuizData.levels) {
+      if (isLevelUnlocked(lvl.id) && !isLevelCompleted(lvl.id)) {
+        nextOpenUncompleted = lvl.id;
+        break;
+      }
     }
+
+    if (nextOpenUncompleted != null) {
+      // يوجد مرحلة مفتوحة لم تُكتمل بعد → اجعلها الحالية
+      setCurrentLevel(nextOpenUncompleted);
+    } else if (levelId >= _currentLevel) {
+      // كل المراحل المفتوحة مكتملة → اجعل الحالية هي آخر مرحلة مكتملة
+      setCurrentLevel(levelId);
+    }
+
     notifyListeners();
   }
 
@@ -800,6 +814,20 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final lvl = QuizData.levels.firstWhere(
         (l) => l.id == widget.gameState.currentLevel,
         orElse: () => QuizData.levels.first);
+
+    // إذا كانت المرحلة الحالية مكتملة، ابحث عن أول مرحلة غير مكتملة
+    if (widget.gameState.isLevelCompleted(lvl.id)) {
+      final next = QuizData.levels.firstWhereOrNull((l) =>
+          widget.gameState.isLevelUnlocked(l.id) &&
+          !widget.gameState.isLevelCompleted(l.id));
+      if (next != null) {
+        widget.gameState.setCurrentLevel(next.id);
+        Navigator.push(context,
+            _route(QuizScreen(level: next, gameState: widget.gameState)));
+        return;
+      }
+    }
+
     Navigator.push(
         context, _route(QuizScreen(level: lvl, gameState: widget.gameState)));
   }

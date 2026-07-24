@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
-// استيراد ملف الأسئلة والنماذج
 import 'quiz_data.dart';
 import 'ad_manager.dart';
 
@@ -11,17 +10,14 @@ import 'ad_manager.dart';
 // ============================================================
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // إجبار الوضع العمودي
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
-  // شريط الحالة شفاف
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.light,
   ));
-  // تهيئة إعلانات AdMob
   await MobileAds.instance.initialize();
   runApp(const QuizApp());
 }
@@ -30,7 +26,6 @@ void main() async {
 // 🎨 ألوان التطبيق المركزية
 // ============================================================
 class AppColors {
-  // وضع داكن
   static const Color primaryDark = Color(0xFF6C63FF);
   static const Color secondaryDark = Color(0xFF03DAC6);
   static const Color backgroundDark = Color(0xFF0D0D1A);
@@ -38,18 +33,15 @@ class AppColors {
   static const Color cardDark = Color(0xFF16213E);
   static const Color textPrimaryDark = Color(0xFFFFFFFF);
   static const Color textSecDark = Color(0xFFB0B0D0);
-  // وضع فاتح
   static const Color primaryLight = Color(0xFF5B52D9);
   static const Color backgroundLight = Color(0xFFF5F5FF);
   static const Color surfaceLight = Color(0xFFFFFFFF);
   static const Color cardLight = Color(0xFFEEEEFF);
   static const Color textPrimaryLight = Color(0xFF1A1A2E);
   static const Color textSecLight = Color(0xFF5A5A7A);
-  // حالات الإجابة
   static const Color correctColor = Color(0xFF4CAF50);
   static const Color wrongColor = Color(0xFFE53935);
   static const Color goldColor = Color(0xFFFFD700);
-  // تدرجات
   static const LinearGradient primaryGradient = LinearGradient(
     colors: [Color(0xFF6C63FF), Color(0xFF9C27B0)],
     begin: Alignment.topLeft,
@@ -63,7 +55,7 @@ class AppColors {
 }
 
 // ============================================================
-// 💾 طبقة التخزين المحلي (SharedPreferences)
+// 💾 طبقة التخزين المحلي
 // ============================================================
 class GameStorage {
   static const String _kScore = 'total_score';
@@ -141,7 +133,7 @@ class GameState extends ChangeNotifier {
     _completedLevels = await GameStorage.getCompletedLevels();
     _isDarkMode = await GameStorage.getDarkMode();
 
-    // تأكد من فتح المرحلة الأولى دائماً
+    // ✅ تأكد من فتح المرحلة الأولى دائماً
     if (!_unlockedLevels.contains(1)) {
       _unlockedLevels.add(1);
     }
@@ -151,9 +143,9 @@ class GameState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// فتح المراحل بالتسلسل (بدون نقاط)
+  /// ✅ فتح المراحل بالتسلسل (بدون شرط النقاط)
   void _syncUnlockedLevels() {
-    // ابدأ من المرحلة 1 وافتح كل مرحلة تالية إذا كانت السابقة مكتملة
+    // ابدأ من المرحلة 2، وافتح كل مرحلة إذا كانت السابقة مكتملة
     for (int i = 2; i <= QuizData.levels.length; i++) {
       final prevLevelId = i - 1;
       if (_completedLevels.contains(prevLevelId) &&
@@ -170,14 +162,14 @@ class GameState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// ✅ تم التعديل: حفظ المرحلة المكتملة وفتح المرحلة التالية بالتسلسل
+  /// ✅ تم التعديل: حفظ المرحلة المكتملة + فتح التالية + تحديث المرحلة الحالية
   void markLevelCompleted(int levelId) {
     if (!_completedLevels.contains(levelId)) {
       _completedLevels.add(levelId);
       GameStorage.saveCompletedLevels(_completedLevels);
     }
 
-    // ✅ تحديث المرحلة الحالية إلى المرحلة المكتملة
+    // ✅ تحديث المرحلة الحالية إلى المرحلة المكتملة (مهم جداً!)
     if (levelId >= _currentLevel) {
       setCurrentLevel(levelId);
     }
@@ -321,7 +313,6 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   void initState() {
     super.initState();
-    // تهيئة مسبقة للإعلان البيني ليكون جاهزاً عند نهاية أول مرحلة
     AdManager.instance.loadInterstitial();
     _scaleCtrl.forward();
     Future.delayed(const Duration(milliseconds: 200), () {
@@ -362,7 +353,6 @@ class _SplashScreenState extends State<SplashScreen>
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const Spacer(flex: 2),
-              // ── أيقونة متحركة ──
               Center(
                 child: ScaleTransition(
                   scale: _scaleAnim,
@@ -383,13 +373,12 @@ class _SplashScreenState extends State<SplashScreen>
                         ],
                       ),
                       child: const Center(
-                          child: Text('🧠', style: TextStyle(fontSize: 68))),
+                          child: Text('', style: TextStyle(fontSize: 68))),
                     ),
                   ),
                 ),
               ),
               const SizedBox(height: 28),
-              // ─ اسم اللعبة ──
               FadeTransition(
                 opacity: _fadeAnim,
                 child: Column(children: [
@@ -414,7 +403,6 @@ class _SplashScreenState extends State<SplashScreen>
                 ]),
               ),
               const Spacer(flex: 2),
-              // ── شريط تحميل متحرك ─
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 60),
                 child: AnimatedBuilder(
@@ -465,7 +453,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           CurvedAnimation(parent: _headerCtrl, curve: Curves.easeOutCubic));
   late final Animation<double> _cardsFade = Tween<double>(begin: 0.0, end: 1.0)
       .animate(CurvedAnimation(parent: _cardsCtrl, curve: Curves.easeIn));
-  // ── إعلان البانر في الشاشة الرئيسية ──
   BannerAd? _bannerAd;
   bool _bannerReady = false;
 
@@ -496,7 +483,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     super.dispose();
   }
 
-  // ── helpers ──
   bool get _isDark => widget.gameState.isDarkMode;
   Color get _bg =>
       _isDark ? AppColors.backgroundDark : AppColors.backgroundLight;
@@ -504,6 +490,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Color get _txt =>
       _isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
   Color get _sub => _isDark ? AppColors.textSecDark : AppColors.textSecLight;
+
+  /// ✅ تبحث عن أول مرحلة مفتوحة وغير مكتملة (المرحلة التي سيدخلها اللاعب فعلياً)
+  int _getNextLevelId() {
+    for (final lvl in QuizData.levels) {
+      if (widget.gameState.isLevelUnlocked(lvl.id) &&
+          !widget.gameState.isLevelCompleted(lvl.id)) {
+        return lvl.id;
+      }
+    }
+    // إذا كل المراحل مكتملة
+    return QuizData.levels.length;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -517,30 +515,29 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // ─── شريط علوي ───
                 _buildTopBar(),
                 const SizedBox(height: 20),
-                // ─── بطاقة النقاط ───
                 SlideTransition(
                   position: _headerSlide,
                   child: _buildScoreCard(),
                 ),
                 const SizedBox(height: 22),
-                // ─── إحصاء سريع ───
                 SlideTransition(
                   position: _headerSlide,
                   child: _buildQuickStats(),
                 ),
                 const SizedBox(height: 26),
-                // ─── أزرار الإجراءات ───
                 FadeTransition(
                   opacity: _cardsFade,
                   child: Column(children: [
+                    // ✅ تم التعديل: النص يعكس المرحلة الفعلية
                     _actionBtn(
                       icon: Icons.play_arrow_rounded,
                       title: 'ابدأ اللعبة',
-                      subtitle:
-                          'استكمل من المرحلة ${widget.gameState.currentLevel}',
+                      subtitle: widget.gameState.completedLevels.length ==
+                              QuizData.levels.length
+                          ? '🎉 جميع المراحل مكتملة'
+                          : 'المرحلة ${_getNextLevelId()}',
                       gradient: AppColors.primaryGradient,
                       onTap: _startGame,
                     ),
@@ -577,7 +574,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       onTap: _openPrivacy,
                     ),
                     const SizedBox(height: 18),
-                    // أزرار صغيرة
                     Row(children: [
                       Expanded(
                         child: _smallBtn(Icons.refresh_rounded, 'إعادة ضبط',
@@ -591,7 +587,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     ]),
                   ]),
                 ),
-                // ─── إعلان البانر (يظهر فقط بعد التحميل بنجاح) ──
                 if (_bannerReady && _bannerAd != null) ...[
                   const SizedBox(height: 18),
                   Container(
@@ -609,7 +604,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  // ── شريط علوي ──
   Widget _buildTopBar() => Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -632,7 +626,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         ],
       );
 
-  // ── بطاقة النقاط ──
   Widget _buildScoreCard() => Container(
         padding: const EdgeInsets.all(22),
         decoration: BoxDecoration(
@@ -685,7 +678,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 TextStyle(color: Colors.white.withOpacity(0.75), fontSize: 10)),
       ]);
 
-  // ── إحصاء سريع ──
   Widget _buildQuickStats() {
     final total = QuizData.levels.fold(0, (s, l) => s + l.questions.length);
     final answered = widget.gameState.completedLevels.fold(0, (s, id) {
@@ -727,7 +719,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  // ── زر إجراء رئيسي ──
   Widget _actionBtn({
     required IconData icon,
     required String title,
@@ -779,7 +770,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         ),
       );
 
-  // ── زر صغير ─
   Widget _smallBtn(
           IconData ic, String label, Color color, VoidCallback onTap) =>
       GestureDetector(
@@ -801,31 +791,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         ),
       );
 
-  // ── تنقل ──
-  // ✅ تم التعديل: البحث عن أول مرحلة مفتوحة وغير مكتملة
+  // ✅ تم التعديل: يبدأ من المرحلة التي وصل إليها فعلياً
   void _startGame() {
-    // ابحث عن أول مرحلة مفتوحة وغير مكتملة
-    QuizLevel? nextUncompleted;
-    for (final lvl in QuizData.levels) {
-      if (widget.gameState.isLevelUnlocked(lvl.id) &&
-          !widget.gameState.isLevelCompleted(lvl.id)) {
-        nextUncompleted = lvl;
-        break;
-      }
-    }
-
-    // إذا وجدت مرحلة غير مكتملة، ابدأ منها
-    if (nextUncompleted != null) {
-      widget.gameState.setCurrentLevel(nextUncompleted.id);
-      Navigator.push(
-        context,
-        _route(QuizScreen(level: nextUncompleted, gameState: widget.gameState)),
-      );
-      return;
-    }
-
-    // إذا كل المراحل مكتملة، ابدأ من المرحلة الأولى
-    final lvl = QuizData.levels.first;
+    final startLevelId = _getNextLevelId();
+    final lvl = QuizData.levels.firstWhere((l) => l.id == startLevelId);
+    widget.gameState.setCurrentLevel(lvl.id);
     Navigator.push(
       context,
       _route(QuizScreen(level: lvl, gameState: widget.gameState)),
@@ -880,7 +850,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           content: Column(mainAxisSize: MainAxisSize.min, children: [
-            const Text('🧠', style: TextStyle(fontSize: 52)),
+            const Text('', style: TextStyle(fontSize: 52)),
             const SizedBox(height: 10),
             const Text('لعبة الأسئلة',
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
@@ -951,7 +921,7 @@ class LevelSelectorScreen extends StatelessWidget {
                                   QuizScreen(level: lvl, gameState: gameState)),
                         );
                       }
-                    : () => _lockedSnack(context, lvl),
+                    : () => _lockedSnack(context),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 300),
                   decoration: BoxDecoration(
@@ -980,7 +950,6 @@ class LevelSelectorScreen extends StatelessWidget {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // ── أيقونة + تراكب ──
                       Stack(alignment: Alignment.center, children: [
                         Text(lvl.icon, style: const TextStyle(fontSize: 38)),
                         if (!unlocked)
@@ -1017,7 +986,6 @@ class LevelSelectorScreen extends StatelessWidget {
                               fontSize: 13,
                               fontWeight: FontWeight.bold)),
                       const SizedBox(height: 6),
-                      // ── شارات ──
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -1056,9 +1024,9 @@ class LevelSelectorScreen extends StatelessWidget {
                 TextStyle(color: fg, fontSize: 9, fontWeight: FontWeight.bold)),
       );
 
-  void _lockedSnack(BuildContext ctx, QuizLevel lvl) {
+  void _lockedSnack(BuildContext ctx) {
     ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
-      content: Text('أكمل المرحلة السابقة لفتح هذه المرحلة '),
+      content: Text('أكمل المرحلة السابقة لفتح هذه المرحلة 🔒'),
       behavior: SnackBarBehavior.floating,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     ));
@@ -1085,7 +1053,6 @@ class ProgressScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // ─ ملخص عام ──
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
@@ -1108,7 +1075,6 @@ class ProgressScreen extends StatelessWidget {
               style: TextStyle(
                   color: txt, fontSize: 17, fontWeight: FontWeight.bold)),
           const SizedBox(height: 12),
-          // ── قائمة المراحل ──
           ...QuizData.levels.map((lvl) {
             final unlocked = gameState.isLevelUnlocked(lvl.id);
             final completed = gameState.isLevelCompleted(lvl.id);
@@ -1180,7 +1146,6 @@ class ProgressScreen extends StatelessWidget {
             );
           }),
           const SizedBox(height: 8),
-          // ── نصيحة ─
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
@@ -1189,7 +1154,7 @@ class ProgressScreen extends StatelessWidget {
               border: Border.all(color: AppColors.goldColor.withOpacity(0.3)),
             ),
             child: Row(children: [
-              const Text('', style: TextStyle(fontSize: 20)),
+              const Text('💡', style: TextStyle(fontSize: 20)),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
@@ -1697,7 +1662,7 @@ class LevelCompleteDialog extends StatelessWidget {
         decoration: BoxDecoration(
             gradient: gradient, borderRadius: BorderRadius.circular(26)),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Text(isPerfect ? '👑' : '', style: const TextStyle(fontSize: 56)),
+          Text(isPerfect ? '👑' : '🎉', style: const TextStyle(fontSize: 56)),
           const SizedBox(height: 8),
           Text(isPerfect ? 'أداء مثالي!' : 'أحسنت!',
               style: const TextStyle(
@@ -1789,7 +1754,7 @@ class LevelCompleteDialog extends StatelessWidget {
 }
 
 // ============================================================
-//  شاشة سياسة الخصوصية
+// 🔒 شاشة سياسة الخصوصية
 // ============================================================
 class PrivacyPolicyScreen extends StatelessWidget {
   const PrivacyPolicyScreen({super.key});
@@ -1825,59 +1790,22 @@ class PrivacyPolicyScreen extends StatelessWidget {
           const SizedBox(height: 22),
           _section('1. المقدمة',
               'مرحباً بكم في تطبيق "لعبة الأسئلة". نحن ملتزمون بحماية خصوصيتكم. توضح هذه السياسة كيفية جمعنا للمعلومات واستخدامها وحمايتها.'),
-          _section(
-            '2. البيانات التي نحفظها',
-            'التطبيق يحفظ البيانات التالية محلياً على جهازك فقط:\n'
-                '• إجمالي النقاط المكتسبة\n'
-                '• رقم المرحلة الحالية\n'
-                '• قائمة المراحل المفتوحة والمكتملة\n'
-                '• تفضيل الوضع الداكن أو الفاتح\n'
-                'لا نجمع أي بيانات شخصية كالاسم أو البريد الإلكتروني أو الموقع الجغرافي.',
-          ),
-          _section(
-            '3. استخدام البيانات',
-            'البيانات المحفوظة تُستخدم حصرياً لـ:\n'
-                '• حفظ تقدمك في اللعبة وعدم فقده\n'
-                '• عرض النقاط والمراحل المفتوحة\n'
-                '• تذكّر تفضيلات العرض\n'
-                'لا تُشارك هذه البيانات مع أي طرف ثالث إطلاقاً.',
-          ),
-          _section(
-            '4. الإعلانات',
-            'يستخدم التطبيق خدمة إعلانات Google AdMob لعرض إعلانات (بانر وإعلانات بينية) '
-                'داخل التطبيق لدعم استمراريته مجاناً. قد تقوم Google بجمع معرّف الجهاز '
-                'الإعلاني ومعلومات تقنية أخرى وفق سياسة خصوصية Google الخاصة بالإعلانات، '
-                'والتي يمكنك مراجعتها والتحكم بتفضيلاتها عبر إعدادات جهازك.',
-          ),
-          _section(
-            '5. أمان البيانات',
-            'بيانات تقدمك محفوظة على جهازك فقط باستخدام SharedPreferences ولا يُرسَل '
-                'أي شيء منها إلى خوادمنا. يمكنك حذف جميع بياناتك في أي وقت عبر "إعادة ضبط" '
-                'في الشاشة الرئيسية.',
-          ),
-          _section(
-            '6. حقوقك',
-            'لديك الحق الكامل في:\n'
-                '• الاطلاع على بياناتك المحفوظة\n'
-                '• حذفها في أي وقت تشاء\n'
-                '• إيقاف استخدام التطبيق',
-          ),
-          _section(
-            '7. الأطفال',
-            'تطبيقنا مناسب لجميع الأعمار. لا نجمع أي بيانات خاصة بالأطفال '
-                'دون موافقة ولي الأمر، إذ لا نجمع بيانات شخصية أصلاً بخلاف ما توفره خدمة الإعلانات.',
-          ),
-          _section(
-            '8. التعديلات',
-            'قد نحدّث هذه السياسة من وقت لآخر. سيتم إخطارك بأي تغييرات '
-                'جوهرية عند تحديث التطبيق.',
-          ),
-          _section(
-            '9. تواصل معنا',
-            'لأي استفسار حول سياسة الخصوصية:\n'
-                '📧 support@quizgame.app\n'
-                '🌐 www.quizgame.app',
-          ),
+          _section('2. البيانات التي نحفظها',
+              'التطبيق يحفظ البيانات التالية محلياً على جهازك فقط:\n• إجمالي النقاط المكتسبة\n• رقم المرحلة الحالية\n• قائمة المراحل المفتوحة والمكتملة\n• تفضيل الوضع الداكن أو الفاتح\nلا نجمع أي بيانات شخصية كالاسم أو البريد الإلكتروني أو الموقع الجغرافي.'),
+          _section('3. استخدام البيانات',
+              'البيانات المحفوظة تُستخدم حصرياً لـ:\n• حفظ تقدمك في اللعبة وعدم فقده\n• عرض النقاط والمراحل المفتوحة\n• تذكّر تفضيلات العرض\nلا تُشارك هذه البيانات مع أي طرف ثالث إطلاقاً.'),
+          _section('4. الإعلانات',
+              'يستخدم التطبيق خدمة إعلانات Google AdMob لعرض إعلانات (بانر وإعلانات بينية) داخل التطبيق لدعم استمراريته مجاناً. قد تقوم Google بجمع معرّف الجهاز الإعلاني ومعلومات تقنية أخرى وفق سياسة خصوصية Google الخاصة بالإعلانات، والتي يمكنك مراجعتها والتحكم بتفضيلاتها عبر إعدادات جهازك.'),
+          _section('5. أمان البيانات',
+              'بيانات تقدمك محفوظة على جهازك فقط باستخدام SharedPreferences ولا يُرسَل أي شيء منها إلى خوادمنا. يمكنك حذف جميع بياناتك في أي وقت عبر "إعادة ضبط" في الشاشة الرئيسية.'),
+          _section('6. حقوقك',
+              'لديك الحق الكامل في:\n• الاطلاع على بياناتك المحفوظة\n• حذفها في أي وقت تشاء\n• إيقاف استخدام التطبيق'),
+          _section('7. الأطفال',
+              'تطبيقنا مناسب لجميع الأعمار. لا نجمع أي بيانات خاصة بالأطفال دون موافقة ولي الأمر، إذ لا نجمع بيانات شخصية أصلاً بخلاف ما توفره خدمة الإعلانات.'),
+          _section('8. التعديلات',
+              'قد نحدّث هذه السياسة من وقت لآخر. سيتم إخطارك بأي تغييرات جوهرية عند تحديث التطبيق.'),
+          _section('9. تواصل معنا',
+              'لأي استفسار حول سياسة الخصوصية:\n📧 support@quizgame.app\n🌐 www.quizgame.app'),
           const SizedBox(height: 16),
           Container(
             padding: const EdgeInsets.all(16),
@@ -1888,8 +1816,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
                   Border.all(color: AppColors.primaryDark.withOpacity(0.50)),
             ),
             child: const Text(
-              'باستخدامك للتطبيق فأنت توافق على هذه السياسة. '
-              'إن لم تكن موافقاً يرجى التوقف عن الاستخدام.',
+              'باستخدامك للتطبيق فأنت توافق على هذه السياسة. إن لم تكن موافقاً يرجى التوقف عن الاستخدام.',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 14, height: 1.6),
             ),

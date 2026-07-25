@@ -27,6 +27,69 @@ void main() async {
 }
 
 // ============================================================
+// 🎬 مساعد إعلان المكافأة (شاهد إعلان = احصل على عملات)
+// ============================================================
+class RewardedAdHelper {
+  static RewardedAd? _ad;
+  static bool _isLoading = false;
+
+  // ⚠️ هذا معرّف إعلان تجريبي (Test Ad Unit) من Google لأغراض التطوير فقط.
+  // استبدله بمعرّف إعلان المكافأة الحقيقي الخاص بك من حساب AdMob قبل النشر.
+  static const String _adUnitId = 'ca-app-pub-3940256099942544/5224354917';
+
+  static void load() {
+    if (_isLoading || _ad != null) return;
+    _isLoading = true;
+    RewardedAd.load(
+      adUnitId: _adUnitId,
+      request: const AdRequest(),
+      rewardedAdLoadCallback: RewardedAdLoadCallback(
+        onAdLoaded: (ad) {
+          _ad = ad;
+          _isLoading = false;
+        },
+        onAdFailedToLoad: (err) {
+          _ad = null;
+          _isLoading = false;
+        },
+      ),
+    );
+  }
+
+  static bool get isReady => _ad != null;
+
+  /// يعرض الإعلان إن كان جاهزاً وإلا يحاول تحميله ويستدعي onNotReady
+  static void show({
+    required VoidCallback onReward,
+    VoidCallback? onDismissed,
+    VoidCallback? onNotReady,
+  }) {
+    final ad = _ad;
+    if (ad == null) {
+      load();
+      if (onNotReady != null) onNotReady();
+      return;
+    }
+    ad.fullScreenContentCallback = FullScreenContentCallback(
+      onAdDismissedFullScreenContent: (a) {
+        a.dispose();
+        _ad = null;
+        load();
+        if (onDismissed != null) onDismissed();
+      },
+      onAdFailedToShowFullScreenContent: (a, e) {
+        a.dispose();
+        _ad = null;
+        load();
+        if (onDismissed != null) onDismissed();
+      },
+    );
+    _ad = null; // يُستهلك فور العرض
+    ad.show(onUserEarnedReward: (a, reward) => onReward());
+  }
+}
+
+// ============================================================
 // 🎨 ألوان التطبيق المركزية
 // ============================================================
 class AppColors {
@@ -71,6 +134,19 @@ class GameStorage {
   static const String _kUnlocked = 'unlocked_levels';
   static const String _kDarkMode = 'is_dark_mode';
   static const String _kCompletedLvl = 'completed_levels';
+  // ✅ تتبع تقدم المرحلة الجارية (رقم السؤال + نقاط المرحلة)
+  static const String _kProgLevel = 'inprogress_level';
+  static const String _kProgQIdx = 'inprogress_qidx';
+  static const String _kProgScore = 'inprogress_score';
+  // ✅ خريطة "أعلى رقم سؤال أُجيب عليه" لكل مرحلة (لشريط التقدم الكلي)
+  static const String _kLevelAnsweredMap = 'level_answered_map';
+  // ✅ عملات المساعدة (تُستخدم لشراء وسائل المساعدة مثل 50/50)
+  static const String _kCoins = 'coins';
+
+  static Future<void> saveCoins(int v) async =>
+      (await SharedPreferences.getInstance()).setInt(_kCoins, v);
+  static Future<int> getCoins() async =>
+      (await SharedPreferences.getInstance()).getInt(_kCoins) ?? 20;
 
   static Future<void> saveScore(int v) async =>
       (await SharedPreferences.getInstance()).setInt(_kScore, v);
@@ -104,6 +180,61 @@ class GameStorage {
     return (p.getStringList(_kCompletedLvl) ?? []).map(int.parse).toList();
   }
 
+  /// ✅ حفظ تقدم المرحلة الجارية (أي سؤال وصلنا له وكم نقطة جمعنا بهذه المرحلة)
+  static Future<void> saveLevelProgress(
+      int levelId, int qIdx, int levelScore) async {
+    final p = await SharedPreferences.getInstance();
+    await p.setInt(_kProgLevel, levelId);
+    await p.setInt(_kProgQIdx, qIdx);
+    await p.setInt(_kProgScore, levelScore);
+  }
+
+  /// ✅ قراءة تقدم المرحلة الجارية إن وجد
+  static Future<Map<String, int>?> getLevelProgress() async {
+    final p = await SharedPreferences.getInstance();
+    if (!p.containsKey(_kProgLevel)) return null;
+    return {
+      'levelId': p.getInt(_kProgLevel) ?? -1,
+      'qIdx': p.getInt(_kProgQIdx) ?? 0,
+      'levelScore': p.getInt(_kProgScore) ?? 0,
+    };
+  }
+
+  /// ✅ مسح تقدم المرحلة الجارية (عند إكمالها أو إعادتها من الصفر)
+  static Future<void> clearLevelProgress() async {
+    final p = await SharedPreferences.getInstance();
+    await p.remove(_kProgLevel);
+    await p.remove(_kProgQIdx);
+    await p.remove(_kProgScore);
+  }
+
+  /// ✅ حفظ أعلى رقم سؤال تمت الإجابة عليه في مرحلة معيّنة (لشريط التقدم الكلي)
+  static Future<void> saveLevelAnsweredCount(int levelId, int count) async {
+    final p = await SharedPreferences.getInstance();
+    final map = await getLevelAnsweredMap();
+    final current = map[levelId] ?? 0;
+    if (count > current) {
+      map[levelId] = count;
+      final encoded = map.entries.map((e) => '${e.key}:${e.value}').toList();
+      await p.setStringList(_kLevelAnsweredMap, encoded);
+    }
+  }
+
+  static Future<Map<int, int>> getLevelAnsweredMap() async {
+    final p = await SharedPreferences.getInstance();
+    final raw = p.getStringList(_kLevelAnsweredMap) ?? [];
+    final map = <int, int>{};
+    for (final e in raw) {
+      final parts = e.split(':');
+      if (parts.length == 2) {
+        final id = int.tryParse(parts[0]);
+        final cnt = int.tryParse(parts[1]);
+        if (id != null && cnt != null) map[id] = cnt;
+      }
+    }
+    return map;
+  }
+
   static Future<void> resetGame() async {
     final p = await SharedPreferences.getInstance();
     await Future.wait([
@@ -111,6 +242,11 @@ class GameStorage {
       p.remove(_kLevel),
       p.remove(_kUnlocked),
       p.remove(_kCompletedLvl),
+      p.remove(_kProgLevel),
+      p.remove(_kProgQIdx),
+      p.remove(_kProgScore),
+      p.remove(_kLevelAnsweredMap),
+      p.remove(_kCoins),
     ]);
   }
 }
@@ -125,6 +261,9 @@ class GameState extends ChangeNotifier {
   List<int> _completedLevels = [];
   bool _isDarkMode = true;
   bool _isLoading = true;
+  // ✅ أعلى رقم سؤال أُجيب عليه لكل مرحلة (id -> عدد الأسئلة المُجابة)
+  Map<int, int> _levelAnsweredCounts = {};
+  int _coins = 20;
 
   int get totalScore => _totalScore;
   int get currentLevel => _currentLevel;
@@ -132,6 +271,18 @@ class GameState extends ChangeNotifier {
   List<int> get completedLevels => _completedLevels;
   bool get isDarkMode => _isDarkMode;
   bool get isLoading => _isLoading;
+  int get coins => _coins;
+
+  /// ✅ إجمالي عدد الأسئلة المُجابة فعلياً عبر كل المراحل (مكتملة أو جارية)
+  /// يُستخدم في شريط "التقدم الكلي" بالشاشة الرئيسية
+  int get totalAnsweredQuestions {
+    int sum = 0;
+    for (final lvl in QuizData.levels) {
+      final answered = _levelAnsweredCounts[lvl.id] ?? 0;
+      sum += answered > lvl.questions.length ? lvl.questions.length : answered;
+    }
+    return sum;
+  }
 
   /// تحميل جميع البيانات المحفوظة
   Future<void> loadData() async {
@@ -139,6 +290,8 @@ class GameState extends ChangeNotifier {
     _unlockedLevels = await GameStorage.getUnlockedLevels();
     _completedLevels = await GameStorage.getCompletedLevels();
     _isDarkMode = await GameStorage.getDarkMode();
+    _levelAnsweredCounts = await GameStorage.getLevelAnsweredMap();
+    _coins = await GameStorage.getCoins();
 
     // تأكد من فتح المرحلة الأولى دائماً
     if (!_unlockedLevels.contains(1)) {
@@ -189,6 +342,33 @@ class GameState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// ✅ إضافة عملات (مثلاً بعد مشاهدة إعلان مكافأة)
+  void addCoins(int amount) {
+    _coins += amount;
+    GameStorage.saveCoins(_coins);
+    notifyListeners();
+  }
+
+  /// ✅ محاولة خصم عملات (لشراء وسيلة مساعدة). يرجع false إن لم يكن الرصيد كافياً
+  bool spendCoins(int amount) {
+    if (_coins < amount) return false;
+    _coins -= amount;
+    GameStorage.saveCoins(_coins);
+    notifyListeners();
+    return true;
+  }
+
+  /// ✅ تسجيل أن هذه المرحلة وصل بها المستخدم لهذا العدد من الأسئلة المُجابة
+  /// (لا يتراجع للخلف أبداً - يحفظ فقط أعلى قيمة وصلها) - يغذي شريط التقدم الكلي
+  void recordAnsweredProgress(int levelId, int answeredCount) {
+    final current = _levelAnsweredCounts[levelId] ?? 0;
+    if (answeredCount > current) {
+      _levelAnsweredCounts[levelId] = answeredCount;
+      GameStorage.saveLevelAnsweredCount(levelId, answeredCount);
+      notifyListeners();
+    }
+  }
+
   /// ✅✅ تم الإصلاح: حفظ المرحلة المكتملة وفتح المرحلة التالية.
   /// "المرحلة الحالية" تُحسب دائماً من القائمة الفعلية للمراحل المكتملة/المفتوحة
   /// (نفس دالة _computeResumeLevel المستخدمة عند تحميل التطبيق)، بدلاً من
@@ -198,6 +378,11 @@ class GameState extends ChangeNotifier {
       _completedLevels.add(levelId);
       GameStorage.saveCompletedLevels(_completedLevels);
     }
+
+    // ✅ تأكيد أن هذه المرحلة تُحتسب كاملة في شريط التقدم الكلي
+    final lvl = QuizData.levels.firstWhere((l) => l.id == levelId,
+        orElse: () => QuizData.levels.first);
+    recordAnsweredProgress(levelId, lvl.questions.length);
 
     final nextId = levelId + 1;
 
@@ -229,6 +414,9 @@ class GameState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// ✅ عدد الأسئلة المُجابة في مرحلة معيّنة (سواء اكتملت أو ما زالت جارية)
+  int answeredCountForLevel(int levelId) => _levelAnsweredCounts[levelId] ?? 0;
+
   bool isLevelUnlocked(int id) => _unlockedLevels.contains(id);
   bool isLevelCompleted(int id) => _completedLevels.contains(id);
 
@@ -238,6 +426,8 @@ class GameState extends ChangeNotifier {
     _currentLevel = 1;
     _unlockedLevels = [1];
     _completedLevels = [];
+    _levelAnsweredCounts = {};
+    _coins = 20;
     notifyListeners();
   }
 }
@@ -344,6 +534,8 @@ class _SplashScreenState extends State<SplashScreen>
     super.initState();
     // تهيئة مسبقة للإعلان البيني ليكون جاهزاً عند نهاية أول مرحلة
     AdManager.instance.loadInterstitial();
+    // ✅ تهيئة مسبقة لإعلان المكافأة (مشاهدة إعلان مقابل عملات)
+    RewardedAdHelper.load();
     _scaleCtrl.forward();
     Future.delayed(const Duration(milliseconds: 200), () {
       if (!mounted) return;
@@ -560,8 +752,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     _actionBtn(
                       icon: Icons.play_arrow_rounded,
                       title: 'ابدأ اللعبة',
-                      subtitle:
-                          'استكمل من المرحلة ${widget.gameState.currentLevel}',
+                      subtitle: 'اختر المرحلة التي تريد اللعب منها',
                       gradient: AppColors.primaryGradient,
                       onTap: _startGame,
                     ),
@@ -681,6 +872,24 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   fontSize: 58,
                   fontWeight: FontWeight.bold,
                   height: 1.1)),
+          const SizedBox(height: 8),
+          // ✅ رصيد العملات (تُستخدم لشراء وسائل المساعدة)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.18),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              const Text('🪙', style: TextStyle(fontSize: 14)),
+              const SizedBox(width: 5),
+              Text('${widget.gameState.coins} عملة',
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold)),
+            ]),
+          ),
           Divider(color: Colors.white.withOpacity(0.25), height: 24),
           Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
             _scoreStat(
@@ -709,12 +918,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   // ── إحصاء سريع ──
   Widget _buildQuickStats() {
     final total = QuizData.levels.fold(0, (s, l) => s + l.questions.length);
-    final answered = widget.gameState.completedLevels.fold(0, (s, id) {
-      for (final lvl in QuizData.levels) {
-        if (lvl.id == id) return s + lvl.questions.length;
-      }
-      return s;
-    });
+    // ✅ يشمل الآن الأسئلة المُجابة ضمن مرحلة لم تكتمل بعد أيضاً، وليس فقط
+    // المراحل المكتملة بالكامل — وهذا ما كان يمنع الشريط من التحرك سابقاً.
+    final answered = widget.gameState.totalAnsweredQuestions;
     final pct = total == 0 ? 0.0 : answered / total;
     return Container(
       padding: const EdgeInsets.all(16),
@@ -823,33 +1029,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       );
 
   // ── تنقل ──
-  // ✅ البحث عن أول مرحلة مفتوحة وغير مكتملة
+  // ✅ تم التعديل بناءً على طلب المستخدم: زر "ابدأ اللعبة" لم يعد يخمّن
+  // المرحلة التي وصلت إليها تلقائياً (لتفادي أي خلل مستقبلي في الحساب).
+  // بدلاً من ذلك يفتح مباشرة شاشة "اختيار المرحلة" ليختار المستخدم بنفسه
+  // من وين يريد أن يكمل.
   void _startGame() {
-    // ابحث عن أول مرحلة مفتوحة وغير مكتملة
-    QuizLevel? nextUncompleted;
-    for (final lvl in QuizData.levels) {
-      if (widget.gameState.isLevelUnlocked(lvl.id) &&
-          !widget.gameState.isLevelCompleted(lvl.id)) {
-        nextUncompleted = lvl;
-        break;
-      }
-    }
-
-    // إذا وجدت مرحلة غير مكتملة، ابدأ منها
-    if (nextUncompleted != null) {
-      widget.gameState.setCurrentLevel(nextUncompleted.id);
-      Navigator.push(
-        context,
-        _route(QuizScreen(level: nextUncompleted, gameState: widget.gameState)),
-      );
-      return;
-    }
-
-    // إذا كل المراحل مكتملة، ابدأ من المرحلة الأولى
-    final lvl = QuizData.levels.first;
     Navigator.push(
       context,
-      _route(QuizScreen(level: lvl, gameState: widget.gameState)),
+      _route(LevelSelectorScreen(gameState: widget.gameState)),
     );
   }
 
@@ -941,132 +1128,249 @@ class LevelSelectorScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = gameState.isDarkMode;
     final bg = isDark ? AppColors.backgroundDark : AppColors.backgroundLight;
+    final card = isDark ? AppColors.cardDark : AppColors.cardLight;
+    final txt = isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
+    final sub = isDark ? AppColors.textSecDark : AppColors.textSecLight;
     return Scaffold(
       backgroundColor: bg,
       appBar: _appBar('اختر مرحلتك', isDark),
       body: AnimatedBuilder(
         animation: gameState,
-        builder: (_, __) => Padding(
-          padding: const EdgeInsets.all(14),
-          child: GridView.builder(
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
-              childAspectRatio: 0.82,
-            ),
-            itemCount: QuizData.levels.length,
-            itemBuilder: (ctx, i) {
-              final lvl = QuizData.levels[i];
-              final unlocked = gameState.isLevelUnlocked(lvl.id);
-              final completed = gameState.isLevelCompleted(lvl.id);
-              final isCurrent = gameState.currentLevel == lvl.id;
-              return GestureDetector(
-                onTap: unlocked
-                    ? () {
-                        // ✅ تم حذف استدعاء setCurrentLevel من هنا
-                        // لأن مجرد الدخول لمراجعة/إعادة لعب مرحلة قديمة
-                        // كان يُرجع "المرحلة الحالية" المحفوظة للخلف بشكل خاطئ.
-                        // تحديث المرحلة الحالية أصبح يتم فقط عند إكمال
-                        // مرحلة جديدة فعلاً (داخل GameState.markLevelCompleted).
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) =>
-                                  QuizScreen(level: lvl, gameState: gameState)),
-                        );
-                      }
-                    : () => _lockedSnack(context, lvl),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
-                  decoration: BoxDecoration(
-                    gradient: unlocked
-                        ? LinearGradient(
-                            colors: [lvl.color, lvl.color.withOpacity(0.65)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight)
-                        : LinearGradient(colors: [
-                            Colors.grey.shade800,
-                            Colors.grey.shade700
-                          ]),
-                    borderRadius: BorderRadius.circular(22),
-                    border: isCurrent
-                        ? Border.all(color: AppColors.goldColor, width: 2.5)
-                        : null,
-                    boxShadow: [
-                      BoxShadow(
-                          color: (unlocked ? lvl.color : Colors.black)
-                              .withOpacity(0.3),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4))
-                    ],
-                  ),
-                  padding: const EdgeInsets.all(14),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      // ── أيقونة + تراكب ──
-                      Stack(alignment: Alignment.center, children: [
-                        Text(lvl.icon, style: const TextStyle(fontSize: 38)),
-                        if (!unlocked)
-                          Container(
-                            width: 50,
-                            height: 50,
-                            color: Colors.black.withOpacity(0.45),
-                            child: const Icon(Icons.lock_rounded,
-                                color: Colors.white70, size: 26),
-                          ),
-                        if (completed)
-                          Positioned(
-                            top: -2,
-                            left: -2,
-                            child: Container(
-                              padding: const EdgeInsets.all(3),
-                              decoration: const BoxDecoration(
-                                  color: AppColors.correctColor,
-                                  shape: BoxShape.circle),
-                              child: const Icon(Icons.check,
-                                  color: Colors.white, size: 12),
-                            ),
-                          ),
-                      ]),
-                      const SizedBox(height: 8),
-                      Text('المرحلة ${lvl.id}',
-                          style: TextStyle(
-                              color: Colors.white.withOpacity(0.75),
-                              fontSize: 11)),
-                      Text(lvl.title,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 6),
-                      // ── شارات ──
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          if (isCurrent)
-                            _chip('▶ حالية', AppColors.goldColor, Colors.black),
-                          if (completed)
-                            _chip('✓ مكتملة', AppColors.correctColor,
-                                Colors.white),
-                          if (!unlocked)
-                            _chip('مقفلة', Colors.white24, Colors.white70),
-                        ],
+        builder: (_, __) {
+          // ✅ أول مرحلة مفتوحة وغير مكتملة = "أين وصلت"
+          QuizLevel? resumeLevel;
+          for (final lvl in QuizData.levels) {
+            if (gameState.isLevelUnlocked(lvl.id) &&
+                !gameState.isLevelCompleted(lvl.id)) {
+              resumeLevel = lvl;
+              break;
+            }
+          }
+
+          return Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // ── بطاقة "أين وصلت" مع زر متابعة مباشر ──
+                if (resumeLevel != null)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 14),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      gradient: AppColors.primaryGradient,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                            color: AppColors.primaryDark.withOpacity(0.35),
+                            blurRadius: 16,
+                            offset: const Offset(0, 6))
+                      ],
+                    ),
+                    child: Row(children: [
+                      Container(
+                        width: 52,
+                        height: 52,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Center(
+                            child: Text(resumeLevel.icon,
+                                style: const TextStyle(fontSize: 26))),
                       ),
-                      const SizedBox(height: 4),
-                      Text('${lvl.questions.length} سؤال',
-                          style: TextStyle(
-                              color: Colors.white.withOpacity(0.6),
-                              fontSize: 10)),
-                    ],
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('وصلت إلى المرحلة ${resumeLevel.id}',
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600)),
+                            Text(resumeLevel.title,
+                                style: TextStyle(
+                                    color: Colors.white.withOpacity(0.85),
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () {
+                          gameState.setCurrentLevel(resumeLevel!.id);
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => QuizScreen(
+                                    level: resumeLevel!, gameState: gameState)),
+                          );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text('تابع',
+                              style: TextStyle(
+                                  color: AppColors.primaryDark,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13)),
+                        ),
+                      ),
+                    ]),
+                  )
+                else
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 14),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      gradient: AppColors.goldGradient,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(children: [
+                      const Text('👑', style: TextStyle(fontSize: 30)),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text('أكملت جميع المراحل! يمكنك إعادة أي مرحلة.',
+                            style: const TextStyle(
+                                color: Colors.black,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13)),
+                      ),
+                    ]),
+                  ),
+                // ── شبكة كل المراحل (للاختيار الحر أو المراجعة) ──
+                Expanded(
+                  child: GridView.builder(
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                      childAspectRatio: 0.82,
+                    ),
+                    itemCount: QuizData.levels.length,
+                    itemBuilder: (ctx, i) {
+                      final lvl = QuizData.levels[i];
+                      final unlocked = gameState.isLevelUnlocked(lvl.id);
+                      final completed = gameState.isLevelCompleted(lvl.id);
+                      final isCurrent = gameState.currentLevel == lvl.id;
+                      return GestureDetector(
+                        onTap: unlocked
+                            ? () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                      builder: (_) => QuizScreen(
+                                          level: lvl, gameState: gameState)),
+                                );
+                              }
+                            : () => _lockedSnack(context, lvl),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          decoration: BoxDecoration(
+                            gradient: unlocked
+                                ? LinearGradient(
+                                    colors: [
+                                        lvl.color,
+                                        lvl.color.withOpacity(0.65)
+                                      ],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight)
+                                : LinearGradient(colors: [
+                                    Colors.grey.shade800,
+                                    Colors.grey.shade700
+                                  ]),
+                            borderRadius: BorderRadius.circular(22),
+                            border: isCurrent
+                                ? Border.all(
+                                    color: AppColors.goldColor, width: 2.5)
+                                : null,
+                            boxShadow: [
+                              BoxShadow(
+                                  color: (unlocked ? lvl.color : Colors.black)
+                                      .withOpacity(0.3),
+                                  blurRadius: 12,
+                                  offset: const Offset(0, 4))
+                            ],
+                          ),
+                          padding: const EdgeInsets.all(14),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              // ── أيقونة + تراكب ──
+                              Stack(alignment: Alignment.center, children: [
+                                Text(lvl.icon,
+                                    style: const TextStyle(fontSize: 38)),
+                                if (!unlocked)
+                                  Container(
+                                    width: 50,
+                                    height: 50,
+                                    color: Colors.black.withOpacity(0.45),
+                                    child: const Icon(Icons.lock_rounded,
+                                        color: Colors.white70, size: 26),
+                                  ),
+                                if (completed)
+                                  Positioned(
+                                    top: -2,
+                                    left: -2,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(3),
+                                      decoration: const BoxDecoration(
+                                          color: AppColors.correctColor,
+                                          shape: BoxShape.circle),
+                                      child: const Icon(Icons.check,
+                                          color: Colors.white, size: 12),
+                                    ),
+                                  ),
+                              ]),
+                              const SizedBox(height: 8),
+                              Text('المرحلة ${lvl.id}',
+                                  style: TextStyle(
+                                      color: Colors.white.withOpacity(0.75),
+                                      fontSize: 11)),
+                              Text(lvl.title,
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 6),
+                              // ── شارات ──
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  if (isCurrent)
+                                    _chip('▶ حالية', AppColors.goldColor,
+                                        Colors.black),
+                                  if (completed)
+                                    _chip('✓ مكتملة', AppColors.correctColor,
+                                        Colors.white),
+                                  if (!unlocked)
+                                    _chip('مقفلة', Colors.white24,
+                                        Colors.white70),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Text('${lvl.questions.length} سؤال',
+                                  style: TextStyle(
+                                      color: Colors.white.withOpacity(0.6),
+                                      fontSize: 10)),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ),
-              );
-            },
-          ),
-        ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
@@ -1104,127 +1408,182 @@ class ProgressScreen extends StatelessWidget {
     final card = isDark ? AppColors.cardDark : AppColors.cardLight;
     final txt = isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
     final sub = isDark ? AppColors.textSecDark : AppColors.textSecLight;
+    final totalQuestions =
+        QuizData.levels.fold(0, (s, l) => s + l.questions.length);
     return Scaffold(
       backgroundColor: bg,
       appBar: _appBar('لوحة التقدم', isDark),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          // ─ ملخص عام ──
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              gradient: AppColors.primaryGradient,
-              borderRadius: BorderRadius.circular(22),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _summaryItem('🏆', '${gameState.totalScore}', 'إجمالي النقاط'),
-                _summaryItem(
-                    '✅', '${gameState.completedLevels.length}', 'مراحل مكتملة'),
-                _summaryItem(
-                    '🔓', '${gameState.unlockedLevels.length}', 'مراحل مفتوحة'),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-          Text('تفاصيل المراحل',
-              style: TextStyle(
-                  color: txt, fontSize: 17, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 12),
-          // ── قائمة المراحل ──
-          ...QuizData.levels.map((lvl) {
-            final unlocked = gameState.isLevelUnlocked(lvl.id);
-            final completed = gameState.isLevelCompleted(lvl.id);
-            final progress = completed ? 1.0 : 0.0;
-            return Container(
-              margin: const EdgeInsets.only(bottom: 10),
-              padding: const EdgeInsets.all(14),
+      body: AnimatedBuilder(
+        animation: gameState,
+        builder: (_, __) => ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            // ─ ملخص عام ──
+            Container(
+              padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: card,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: completed
-                      ? AppColors.correctColor.withOpacity(0.5)
-                      : unlocked
-                          ? lvl.color.withOpacity(0.3)
-                          : Colors.grey.withOpacity(0.2),
-                ),
+                gradient: AppColors.primaryGradient,
+                borderRadius: BorderRadius.circular(22),
               ),
-              child: Row(children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color:
-                        (unlocked ? lvl.color : Colors.grey).withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Center(
-                      child: Text(unlocked ? lvl.icon : '🔒',
-                          style: const TextStyle(fontSize: 22))),
+              child: Column(children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _summaryItem(
+                        '🏆', '${gameState.totalScore}', 'إجمالي النقاط'),
+                    _summaryItem('✅', '${gameState.completedLevels.length}',
+                        'مراحل مكتملة'),
+                    _summaryItem('🔓', '${gameState.unlockedLevels.length}',
+                        'مراحل مفتوحة'),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                const SizedBox(height: 14),
+                Divider(color: Colors.white.withOpacity(0.25), height: 1),
+                const SizedBox(height: 14),
+                // ✅ إجمالي الأسئلة المُجابة (يشمل المراحل الجارية غير المكتملة)
+                Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(children: [
-                        Text(lvl.title,
-                            style: TextStyle(
-                                color: txt,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14)),
-                        const Spacer(),
-                        if (completed)
-                          const Icon(Icons.check_circle,
-                              color: AppColors.correctColor, size: 18)
-                        else if (!unlocked)
-                          Text('مقفلة',
-                              style: TextStyle(color: sub, fontSize: 10)),
-                      ]),
-                      const SizedBox(height: 4),
-                      Text('${lvl.questions.length} سؤال',
-                          style: TextStyle(color: sub, fontSize: 11)),
-                      const SizedBox(height: 6),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: LinearProgressIndicator(
-                          value: progress,
-                          minHeight: 4,
-                          backgroundColor: Colors.grey.withOpacity(0.2),
-                          valueColor: AlwaysStoppedAnimation(
-                              completed ? AppColors.correctColor : lvl.color),
-                        ),
-                      ),
-                    ],
+                      Text('إجمالي الأسئلة المُجابة',
+                          style: TextStyle(
+                              color: Colors.white.withOpacity(0.9),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600)),
+                      Text(
+                          '${gameState.totalAnsweredQuestions} / $totalQuestions',
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold)),
+                    ]),
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: LinearProgressIndicator(
+                    value: totalQuestions == 0
+                        ? 0
+                        : gameState.totalAnsweredQuestions / totalQuestions,
+                    minHeight: 7,
+                    backgroundColor: Colors.white24,
+                    valueColor: const AlwaysStoppedAnimation(Colors.white),
                   ),
                 ),
               ]),
-            );
-          }),
-          const SizedBox(height: 8),
-          // ── نصيحة ─
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: AppColors.goldColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.goldColor.withOpacity(0.3)),
             ),
-            child: Row(children: [
-              const Text('', style: TextStyle(fontSize: 20)),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'أكمل المراحل بالتسلسل لفتح مراحل جديدة.\nكل إجابة صحيحة = 10 نقاط',
-                  style: TextStyle(color: sub, fontSize: 12, height: 1.5),
+            const SizedBox(height: 20),
+            Text('تفاصيل المراحل',
+                style: TextStyle(
+                    color: txt, fontSize: 17, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+            // ── قائمة المراحل ──
+            ...QuizData.levels.map((lvl) {
+              final unlocked = gameState.isLevelUnlocked(lvl.id);
+              final completed = gameState.isLevelCompleted(lvl.id);
+              // ✅ نسبة فعلية لكل مرحلة، تشمل المراحل الجارية غير المكتملة أيضاً
+              final answeredInLevel = gameState.answeredCountForLevel(lvl.id);
+              final progress = completed
+                  ? 1.0
+                  : (lvl.questions.isEmpty
+                      ? 0.0
+                      : (answeredInLevel / lvl.questions.length)
+                          .clamp(0.0, 1.0));
+              return Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: card,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: completed
+                        ? AppColors.correctColor.withOpacity(0.5)
+                        : unlocked
+                            ? lvl.color.withOpacity(0.3)
+                            : Colors.grey.withOpacity(0.2),
+                  ),
                 ),
+                child: Row(children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: (unlocked ? lvl.color : Colors.grey)
+                          .withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Center(
+                        child: Text(unlocked ? lvl.icon : '🔒',
+                            style: const TextStyle(fontSize: 22))),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(children: [
+                          Text(lvl.title,
+                              style: TextStyle(
+                                  color: txt,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14)),
+                          const Spacer(),
+                          if (completed)
+                            const Icon(Icons.check_circle,
+                                color: AppColors.correctColor, size: 18)
+                          else if (!unlocked)
+                            Text('مقفلة',
+                                style: TextStyle(color: sub, fontSize: 10))
+                          else if (answeredInLevel > 0)
+                            Text('جارية',
+                                style: TextStyle(
+                                    color: AppColors.secondaryDark,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold)),
+                        ]),
+                        const SizedBox(height: 4),
+                        Text(
+                            completed
+                                ? '${lvl.questions.length} سؤال'
+                                : '$answeredInLevel / ${lvl.questions.length} سؤال',
+                            style: TextStyle(color: sub, fontSize: 11)),
+                        const SizedBox(height: 6),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            value: progress,
+                            minHeight: 4,
+                            backgroundColor: Colors.grey.withOpacity(0.2),
+                            valueColor: AlwaysStoppedAnimation(
+                                completed ? AppColors.correctColor : lvl.color),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ]),
+              );
+            }),
+            const SizedBox(height: 8),
+            // ── نصيحة ─
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppColors.goldColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppColors.goldColor.withOpacity(0.3)),
               ),
-            ]),
-          ),
-        ],
+              child: Row(children: [
+                const Text('', style: TextStyle(fontSize: 20)),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'أكمل المراحل بالتسلسل لفتح مراحل جديدة.\nكل إجابة صحيحة = 10 نقاط',
+                    style: TextStyle(color: sub, fontSize: 12, height: 1.5),
+                  ),
+                ),
+              ]),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1262,6 +1621,9 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   int? _selected;
   bool _answered = false;
   bool _isDisposed = false;
+  // ✅ وسائل المساعدة: أرقام الإجابات المحذوفة بواسطة 50/50 لهذا السؤال
+  Set<int> _eliminated = {};
+  bool _watchingAd = false;
   late final AnimationController _qCtrl = AnimationController(
       vsync: this, duration: const Duration(milliseconds: 450));
   late final AnimationController _resCtrl = AnimationController(
@@ -1280,7 +1642,29 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+    _restoreProgressThenStart();
+  }
+
+  /// ✅ استرجاع تقدم هذه المرحلة المحفوظ (إن وُجد) قبل بدء أول سؤال
+  Future<void> _restoreProgressThenStart() async {
+    final prog = await GameStorage.getLevelProgress();
+    if (prog != null && prog['levelId'] == widget.level.id && !_isDisposed) {
+      final savedIdx = prog['qIdx'] ?? 0;
+      final savedScore = prog['levelScore'] ?? 0;
+      if (savedIdx > 0 && savedIdx < _total) {
+        setState(() {
+          _qIdx = savedIdx;
+          _levelScore = savedScore;
+        });
+      }
+    }
+    if (!mounted) return;
     _startQuestion();
+  }
+
+  /// ✅ حفظ مكان التوقف الحالي (رقم السؤال ونقاط المرحلة) فوراً
+  void _persistProgress() {
+    GameStorage.saveLevelProgress(widget.level.id, _qIdx, _levelScore);
   }
 
   void _startQuestion() {
@@ -1318,6 +1702,10 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
       widget.gameState.addScore(10);
       _levelScore += 10;
     }
+    // ✅ تحديث شريط التقدم الكلي فوراً بعدد الأسئلة المُجابة بهذه المرحلة
+    widget.gameState.recordAnsweredProgress(widget.level.id, _qIdx + 1);
+    // ✅ نحفظ فوراً حتى لو أُغلق التطبيق خلال الثواني القليلة القادمة
+    _persistProgress();
     Future.delayed(const Duration(milliseconds: 1900), () {
       if (!mounted) return;
       if (_qIdx < _total - 1) {
@@ -1328,6 +1716,56 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
     });
   }
 
+  /// ✅ وسيلة مساعدة: حذف إجابتين خاطئتين مقابل 10 عملات
+  void _use5050() {
+    if (_answered || _eliminated.isNotEmpty) return;
+    if (!widget.gameState.spendCoins(10)) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('لا تملك عملات كافية 🪙 (تحتاج 10)'),
+        behavior: SnackBarBehavior.floating,
+      ));
+      return;
+    }
+    final wrongIndices = List.generate(_q.options.length, (i) => i)
+        .where((i) => i != _q.correctIndex)
+        .toList()
+      ..shuffle();
+    setState(() {
+      _eliminated = wrongIndices.take(2).toSet();
+    });
+  }
+
+  /// ✅ مشاهدة إعلان مكافأة مقابل 10 عملات مجانية
+  void _watchAdForCoins() {
+    if (_watchingAd) return;
+    if (!RewardedAdHelper.isReady) {
+      RewardedAdHelper.load();
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('الإعلان غير جاهز بعد، حاول خلال ثوانٍ 🎬'),
+        behavior: SnackBarBehavior.floating,
+      ));
+      return;
+    }
+    setState(() => _watchingAd = true);
+    RewardedAdHelper.show(
+      onReward: () {
+        widget.gameState.addCoins(10);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('+10 عملات 🪙 شكراً لمشاهدتك!'),
+            behavior: SnackBarBehavior.floating,
+          ));
+        }
+      },
+      onDismissed: () {
+        if (mounted) setState(() => _watchingAd = false);
+      },
+      onNotReady: () {
+        if (mounted) setState(() => _watchingAd = false);
+      },
+    );
+  }
+
   void _nextQuestion() {
     _qCtrl.reset();
     _resCtrl.reset();
@@ -1336,11 +1774,16 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
       _qIdx++;
       _selected = null;
       _answered = false;
+      _eliminated = {};
     });
+    // ✅ حفظ رقم السؤال الجديد فوراً كنقطة استكمال
+    _persistProgress();
     _startQuestion();
   }
 
   void _showComplete() {
+    // ✅ المرحلة انتهت، لا حاجة لحفظ نقطة استكمال بعد الآن
+    GameStorage.clearLevelProgress();
     widget.gameState.markLevelCompleted(widget.level.id);
     AdManager.instance.showInterstitial(onDismissed: () {
       if (!mounted) return;
@@ -1368,13 +1811,18 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
     );
   }
 
-  void _restart() => setState(() {
-        _qIdx = 0;
-        _levelScore = 0;
-        _selected = null;
-        _answered = false;
-        _startQuestion();
-      });
+  void _restart() {
+    // ✅ إعادة المرحلة من الصفر تعني مسح نقطة الاستكمال القديمة أيضاً
+    GameStorage.saveLevelProgress(widget.level.id, 0, 0);
+    setState(() {
+      _qIdx = 0;
+      _levelScore = 0;
+      _selected = null;
+      _answered = false;
+      _eliminated = {};
+      _startQuestion();
+    });
+  }
 
   void _goNext() {
     final nextId = widget.level.id + 1;
@@ -1424,9 +1872,79 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
               ),
             ),
             const SizedBox(height: 12),
+            _buildHintsRow(),
+            const SizedBox(height: 10),
             ..._buildOptions(),
           ]),
         ),
+      ),
+    );
+  }
+
+  // ── صف وسائل المساعدة ──
+  Widget _buildHintsRow() {
+    final canUse5050 = !_answered && _eliminated.isEmpty;
+    return Row(children: [
+      Expanded(
+        child: _hintChip(
+          icon: Icons.remove_red_eye_outlined,
+          label: '50/50',
+          costLabel: '10 🪙',
+          enabled: canUse5050,
+          onTap: _use5050,
+        ),
+      ),
+      const SizedBox(width: 10),
+      Expanded(
+        child: _hintChip(
+          icon: Icons.play_circle_outline_rounded,
+          label: _watchingAd ? 'جارٍ التحميل...' : 'مشاهدة إعلان',
+          costLabel: '+10 🪙',
+          enabled: !_answered && !_watchingAd,
+          onTap: _watchAdForCoins,
+          isReward: true,
+        ),
+      ),
+    ]);
+  }
+
+  Widget _hintChip({
+    required IconData icon,
+    required String label,
+    required String costLabel,
+    required bool enabled,
+    required VoidCallback onTap,
+    bool isReward = false,
+  }) {
+    final color = isReward ? AppColors.secondaryDark : widget.level.color;
+    return GestureDetector(
+      onTap: enabled ? onTap : null,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
+        decoration: BoxDecoration(
+          color: (enabled ? color : Colors.grey).withOpacity(0.12),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+              color: (enabled ? color : Colors.grey).withOpacity(0.35)),
+        ),
+        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Icon(icon, size: 16, color: enabled ? color : Colors.grey),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(label,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                    color: enabled ? _txt : Colors.grey,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600)),
+          ),
+          const SizedBox(width: 5),
+          Text(costLabel,
+              style: TextStyle(
+                  color: enabled ? color : Colors.grey,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold)),
+        ]),
       ),
     );
   }
@@ -1469,7 +1987,23 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                     fontWeight: FontWeight.bold,
                     fontSize: 13)),
           ]),
-        )
+        ),
+        const SizedBox(width: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: AppColors.secondaryDark.withOpacity(0.15),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: AppColors.secondaryDark.withOpacity(0.4)),
+          ),
+          child: Row(children: [
+            const Text('🪙', style: TextStyle(fontSize: 12)),
+            const SizedBox(width: 4),
+            Text('${widget.gameState.coins}',
+                style: TextStyle(
+                    color: _txt, fontWeight: FontWeight.bold, fontSize: 13)),
+          ]),
+        ),
       ]);
 
   Widget _buildProgressAndTimer() => Column(children: [
@@ -1603,9 +2137,13 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
       final isSelected = _selected == i;
       final isCorrect = i == _q.correctIndex;
       final isWrong = isSelected && !isCorrect;
+      final isEliminated = _eliminated.contains(i);
       Color borderColor;
       Color bgColor;
-      if (!_answered) {
+      if (isEliminated) {
+        borderColor = Colors.grey.withOpacity(0.15);
+        bgColor = Colors.grey.withOpacity(0.06);
+      } else if (!_answered) {
         borderColor = AppColors.primaryDark.withOpacity(0.35);
         bgColor = AppColors.primaryDark.withOpacity(0.08);
       } else if (isCorrect) {
@@ -1621,7 +2159,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
       return Padding(
         padding: const EdgeInsets.only(bottom: 9),
         child: GestureDetector(
-          onTap: () => _selectAnswer(i),
+          onTap: isEliminated ? null : () => _selectAnswer(i),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 280),
             padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 14),
@@ -1646,7 +2184,8 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                       ? AppColors.correctColor
                       : (_answered && isWrong)
                           ? AppColors.wrongColor
-                          : AppColors.primaryDark.withOpacity(0.15),
+                          : AppColors.primaryDark
+                              .withOpacity(isEliminated ? 0.06 : 0.15),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Center(
@@ -1655,7 +2194,9 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                     style: TextStyle(
                         color: (_answered && (isCorrect || isWrong))
                             ? Colors.white
-                            : AppColors.primaryDark,
+                            : (isEliminated
+                                ? Colors.grey
+                                : AppColors.primaryDark),
                         fontWeight: FontWeight.bold,
                         fontSize: 13),
                   ),
@@ -1663,10 +2204,12 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
               ),
               const SizedBox(width: 12),
               Expanded(
-                  child: Text(_q.options[i],
+                  child: Text(isEliminated ? 'تم استبعادها' : _q.options[i],
                       style: TextStyle(
-                          color: _txt,
+                          color: isEliminated ? Colors.grey : _txt,
                           fontSize: 14,
+                          decoration:
+                              isEliminated ? TextDecoration.lineThrough : null,
                           fontWeight: isSelected
                               ? FontWeight.w600
                               : FontWeight.normal))),
@@ -1676,6 +2219,8 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
               if (_answered && isWrong)
                 const Icon(Icons.cancel_rounded,
                     color: AppColors.wrongColor, size: 20),
+              if (isEliminated)
+                const Icon(Icons.block_rounded, color: Colors.grey, size: 18),
             ]),
           ),
         ),

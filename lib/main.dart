@@ -136,7 +136,6 @@ class GameState extends ChangeNotifier {
   /// تحميل جميع البيانات المحفوظة
   Future<void> loadData() async {
     _totalScore = await GameStorage.getScore();
-    _currentLevel = await GameStorage.getCurrentLevel();
     _unlockedLevels = await GameStorage.getUnlockedLevels();
     _completedLevels = await GameStorage.getCompletedLevels();
     _isDarkMode = await GameStorage.getDarkMode();
@@ -146,8 +145,16 @@ class GameState extends ChangeNotifier {
       _unlockedLevels.add(1);
     }
 
-    _isLoading = false;
     _syncUnlockedLevels();
+
+    // ✅✅ الإصلاح الجذري: لا نثق أبداً بقيمة "current_level" المخزّنة بمفردها،
+    // بل نعيد حسابها دائماً عند كل فتح للتطبيق اعتماداً على المراحل المكتملة
+    // فعلياً (وهي مصدر الحقيقة الوحيد). هذا يمنع رجوعك للمرحلة الأولى
+    // نهائياً، حتى لو حدث أي خلل آخر في القيمة المخزّنة سابقاً.
+    _currentLevel = _computeResumeLevel();
+    await GameStorage.saveCurrentLevel(_currentLevel);
+
+    _isLoading = false;
     notifyListeners();
   }
 
@@ -164,14 +171,28 @@ class GameState extends ChangeNotifier {
     GameStorage.saveUnlockedLevels(_unlockedLevels);
   }
 
+  /// ✅ يحسب أول مرحلة مفتوحة وغير مكتملة (نقطة الاستكمال الصحيحة).
+  /// إذا كانت كل المراحل مكتملة يعيد آخر مرحلة.
+  int _computeResumeLevel() {
+    for (final lvl in QuizData.levels) {
+      if (_unlockedLevels.contains(lvl.id) &&
+          !_completedLevels.contains(lvl.id)) {
+        return lvl.id;
+      }
+    }
+    return QuizData.levels.isEmpty ? 1 : QuizData.levels.last.id;
+  }
+
   void addScore(int pts) {
     _totalScore += pts;
     GameStorage.saveScore(_totalScore);
     notifyListeners();
   }
 
-  /// ✅✅ تم الإصلاح: حفظ المرحلة المكتملة وفتح المرحلة التالية
-  /// مع منع "التراجع للخلف" في المرحلة الحالية عند إعادة لعب مرحلة قديمة مكتملة
+  /// ✅✅ تم الإصلاح: حفظ المرحلة المكتملة وفتح المرحلة التالية.
+  /// "المرحلة الحالية" تُحسب دائماً من القائمة الفعلية للمراحل المكتملة/المفتوحة
+  /// (نفس دالة _computeResumeLevel المستخدمة عند تحميل التطبيق)، بدلاً من
+  /// تحديثها يدوياً بأرقام قد تتراجع للخلف عند إعادة لعب مرحلة قديمة.
   void markLevelCompleted(int levelId) {
     if (!_completedLevels.contains(levelId)) {
       _completedLevels.add(levelId);
@@ -186,14 +207,11 @@ class GameState extends ChangeNotifier {
       GameStorage.saveUnlockedLevels(_unlockedLevels);
     }
 
-    // المرشح للتقدّم: المرحلة التالية إن وجدت، وإلا نفس المرحلة (لو كانت الأخيرة)
-    final int candidateNext =
-        nextId <= QuizData.levels.length ? nextId : levelId;
-
-    // ✅ لا نحدّث "المرحلة الحالية" إلا إذا كان هذا تقدماً حقيقياً للأمام
-    // هذا هو ما يمنع رجوعك للمرحلة الأولى عند إعادة لعب مرحلة قديمة
-    if (candidateNext > _currentLevel) {
-      setCurrentLevel(candidateNext);
+    // ✅ إعادة حساب المرحلة الحالية من مصدر الحقيقة (لا تتراجع أبداً للخلف)
+    final int computed = _computeResumeLevel();
+    if (computed != _currentLevel) {
+      _currentLevel = computed;
+      GameStorage.saveCurrentLevel(_currentLevel);
     }
 
     notifyListeners();

@@ -1094,6 +1094,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 6),
             const Text('الإصدار 1.1.0', style: TextStyle(fontSize: 13)),
+            const Text('طور بواسطة قاسم البلداوي',
+                style: TextStyle(fontSize: 13)),
             const SizedBox(height: 10),
             Container(
               padding: const EdgeInsets.all(12),

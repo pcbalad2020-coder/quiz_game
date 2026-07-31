@@ -2,98 +2,35 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
-// استيراد ملف الأسئلة والنماذج
+
+// استيراد ملفاتك الأخرى
 import 'quiz_data.dart';
-import 'ad_manager.dart';
+import 'ad_manager.dart'; // ✅ استيراد ملف الإعلانات المنفصل
 
 // ============================================================
 // 🚀 نقطة الدخول الرئيسية
 // ============================================================
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // إجبار الوضع العمودي
+
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
-  // شريط الحالة شفاف
+
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.light,
   ));
-  // تهيئة إعلانات AdMob
+
   await MobileAds.instance.initialize();
   runApp(const QuizApp());
-}
-
-// ============================================================
-// 🎬 مساعد إعلان المكافأة (شاهد إعلان = احصل على عملات)
-// ============================================================
-class RewardedAdHelper {
-  static RewardedAd? _ad;
-  static bool _isLoading = false;
-
-  // ⚠️ هذا معرّف إعلان تجريبي (Test Ad Unit) من Google لأغراض التطوير فقط.
-  // استبدله بمعرّف إعلان المكافأة الحقيقي الخاص بك من حساب AdMob قبل النشر.
-  static const String _adUnitId = 'ca-app-pub-3940256099942544/5224354917';
-
-  static void load() {
-    if (_isLoading || _ad != null) return;
-    _isLoading = true;
-    RewardedAd.load(
-      adUnitId: _adUnitId,
-      request: const AdRequest(),
-      rewardedAdLoadCallback: RewardedAdLoadCallback(
-        onAdLoaded: (ad) {
-          _ad = ad;
-          _isLoading = false;
-        },
-        onAdFailedToLoad: (err) {
-          _ad = null;
-          _isLoading = false;
-        },
-      ),
-    );
-  }
-
-  static bool get isReady => _ad != null;
-
-  /// يعرض الإعلان إن كان جاهزاً وإلا يحاول تحميله ويستدعي onNotReady
-  static void show({
-    required VoidCallback onReward,
-    VoidCallback? onDismissed,
-    VoidCallback? onNotReady,
-  }) {
-    final ad = _ad;
-    if (ad == null) {
-      load();
-      if (onNotReady != null) onNotReady();
-      return;
-    }
-    ad.fullScreenContentCallback = FullScreenContentCallback(
-      onAdDismissedFullScreenContent: (a) {
-        a.dispose();
-        _ad = null;
-        load();
-        if (onDismissed != null) onDismissed();
-      },
-      onAdFailedToShowFullScreenContent: (a, e) {
-        a.dispose();
-        _ad = null;
-        load();
-        if (onDismissed != null) onDismissed();
-      },
-    );
-    _ad = null; // يُستهلك فور العرض
-    ad.show(onUserEarnedReward: (a, reward) => onReward());
-  }
 }
 
 // ============================================================
 // 🎨 ألوان التطبيق المركزية
 // ============================================================
 class AppColors {
-  // وضع داكن
   static const Color primaryDark = Color(0xFF6C63FF);
   static const Color secondaryDark = Color(0xFF03DAC6);
   static const Color backgroundDark = Color(0xFF0D0D1A);
@@ -101,18 +38,18 @@ class AppColors {
   static const Color cardDark = Color(0xFF16213E);
   static const Color textPrimaryDark = Color(0xFFFFFFFF);
   static const Color textSecDark = Color(0xFFB0B0D0);
-  // وضع فاتح
+
   static const Color primaryLight = Color(0xFF5B52D9);
   static const Color backgroundLight = Color(0xFFF5F5FF);
   static const Color surfaceLight = Color(0xFFFFFFFF);
   static const Color cardLight = Color(0xFFEEEEFF);
   static const Color textPrimaryLight = Color(0xFF1A1A2E);
   static const Color textSecLight = Color(0xFF5A5A7A);
-  // حالات الإجابة
+
   static const Color correctColor = Color(0xFF4CAF50);
   static const Color wrongColor = Color(0xFFE53935);
   static const Color goldColor = Color(0xFFFFD700);
-  // تدرجات
+
   static const LinearGradient primaryGradient = LinearGradient(
     colors: [Color(0xFF6C63FF), Color(0xFF9C27B0)],
     begin: Alignment.topLeft,
@@ -134,20 +71,16 @@ class GameStorage {
   static const String _kUnlocked = 'unlocked_levels';
   static const String _kDarkMode = 'is_dark_mode';
   static const String _kCompletedLvl = 'completed_levels';
-  // ✅ تتبع تقدم المرحلة الجارية (رقم السؤال + نقاط المرحلة)
   static const String _kProgLevel = 'inprogress_level';
   static const String _kProgQIdx = 'inprogress_qidx';
   static const String _kProgScore = 'inprogress_score';
-  // ✅ خريطة "أعلى رقم سؤال أُجيب عليه" لكل مرحلة (لشريط التقدم الكلي)
   static const String _kLevelAnsweredMap = 'level_answered_map';
-  // ✅ عملات المساعدة (تُستخدم لشراء وسائل المساعدة مثل 50/50)
   static const String _kCoins = 'coins';
 
   static Future<void> saveCoins(int v) async =>
       (await SharedPreferences.getInstance()).setInt(_kCoins, v);
   static Future<int> getCoins() async =>
       (await SharedPreferences.getInstance()).getInt(_kCoins) ?? 20;
-
   static Future<void> saveScore(int v) async =>
       (await SharedPreferences.getInstance()).setInt(_kScore, v);
   static Future<int> getScore() async =>
@@ -160,6 +93,7 @@ class GameStorage {
       (await SharedPreferences.getInstance()).setBool(_kDarkMode, v);
   static Future<bool> getDarkMode() async =>
       (await SharedPreferences.getInstance()).getBool(_kDarkMode) ?? true;
+
   static Future<void> saveUnlockedLevels(List<int> levels) async {
     final p = await SharedPreferences.getInstance();
     await p.setStringList(_kUnlocked, levels.map((e) => '$e').toList());
@@ -180,7 +114,6 @@ class GameStorage {
     return (p.getStringList(_kCompletedLvl) ?? []).map(int.parse).toList();
   }
 
-  /// ✅ حفظ تقدم المرحلة الجارية (أي سؤال وصلنا له وكم نقطة جمعنا بهذه المرحلة)
   static Future<void> saveLevelProgress(
       int levelId, int qIdx, int levelScore) async {
     final p = await SharedPreferences.getInstance();
@@ -189,7 +122,6 @@ class GameStorage {
     await p.setInt(_kProgScore, levelScore);
   }
 
-  /// ✅ قراءة تقدم المرحلة الجارية إن وجد
   static Future<Map<String, int>?> getLevelProgress() async {
     final p = await SharedPreferences.getInstance();
     if (!p.containsKey(_kProgLevel)) return null;
@@ -200,7 +132,6 @@ class GameStorage {
     };
   }
 
-  /// ✅ مسح تقدم المرحلة الجارية (عند إكمالها أو إعادتها من الصفر)
   static Future<void> clearLevelProgress() async {
     final p = await SharedPreferences.getInstance();
     await p.remove(_kProgLevel);
@@ -208,7 +139,6 @@ class GameStorage {
     await p.remove(_kProgScore);
   }
 
-  /// ✅ حفظ أعلى رقم سؤال تمت الإجابة عليه في مرحلة معيّنة (لشريط التقدم الكلي)
   static Future<void> saveLevelAnsweredCount(int levelId, int count) async {
     final p = await SharedPreferences.getInstance();
     final map = await getLevelAnsweredMap();
@@ -261,7 +191,6 @@ class GameState extends ChangeNotifier {
   List<int> _completedLevels = [];
   bool _isDarkMode = true;
   bool _isLoading = true;
-  // ✅ أعلى رقم سؤال أُجيب عليه لكل مرحلة (id -> عدد الأسئلة المُجابة)
   Map<int, int> _levelAnsweredCounts = {};
   int _coins = 20;
 
@@ -273,8 +202,6 @@ class GameState extends ChangeNotifier {
   bool get isLoading => _isLoading;
   int get coins => _coins;
 
-  /// ✅ إجمالي عدد الأسئلة المُجابة فعلياً عبر كل المراحل (مكتملة أو جارية)
-  /// يُستخدم في شريط "التقدم الكلي" بالشاشة الرئيسية
   int get totalAnsweredQuestions {
     int sum = 0;
     for (final lvl in QuizData.levels) {
@@ -284,7 +211,6 @@ class GameState extends ChangeNotifier {
     return sum;
   }
 
-  /// تحميل جميع البيانات المحفوظة
   Future<void> loadData() async {
     _totalScore = await GameStorage.getScore();
     _unlockedLevels = await GameStorage.getUnlockedLevels();
@@ -292,40 +218,23 @@ class GameState extends ChangeNotifier {
     _isDarkMode = await GameStorage.getDarkMode();
     _levelAnsweredCounts = await GameStorage.getLevelAnsweredMap();
     _coins = await GameStorage.getCoins();
-
-    // تأكد من فتح المرحلة الأولى دائماً
-    if (!_unlockedLevels.contains(1)) {
-      _unlockedLevels.add(1);
-    }
-
+    if (!_unlockedLevels.contains(1)) _unlockedLevels.add(1);
     _syncUnlockedLevels();
-
-    // ✅✅ الإصلاح الجذري: لا نثق أبداً بقيمة "current_level" المخزّنة بمفردها،
-    // بل نعيد حسابها دائماً عند كل فتح للتطبيق اعتماداً على المراحل المكتملة
-    // فعلياً (وهي مصدر الحقيقة الوحيد). هذا يمنع رجوعك للمرحلة الأولى
-    // نهائياً، حتى لو حدث أي خلل آخر في القيمة المخزّنة سابقاً.
     _currentLevel = _computeResumeLevel();
     await GameStorage.saveCurrentLevel(_currentLevel);
-
     _isLoading = false;
     notifyListeners();
   }
 
-  /// فتح المراحل بالتسلسل (بدون نقاط)
   void _syncUnlockedLevels() {
-    // ابدأ من المرحلة 1 وافتح كل مرحلة تالية إذا كانت السابقة مكتملة
     for (int i = 2; i <= QuizData.levels.length; i++) {
-      final prevLevelId = i - 1;
-      if (_completedLevels.contains(prevLevelId) &&
-          !_unlockedLevels.contains(i)) {
+      if (_completedLevels.contains(i - 1) && !_unlockedLevels.contains(i)) {
         _unlockedLevels.add(i);
       }
     }
     GameStorage.saveUnlockedLevels(_unlockedLevels);
   }
 
-  /// ✅ يحسب أول مرحلة مفتوحة وغير مكتملة (نقطة الاستكمال الصحيحة).
-  /// إذا كانت كل المراحل مكتملة يعيد آخر مرحلة.
   int _computeResumeLevel() {
     for (final lvl in QuizData.levels) {
       if (_unlockedLevels.contains(lvl.id) &&
@@ -342,14 +251,12 @@ class GameState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// ✅ إضافة عملات (مثلاً بعد مشاهدة إعلان مكافأة)
   void addCoins(int amount) {
     _coins += amount;
     GameStorage.saveCoins(_coins);
     notifyListeners();
   }
 
-  /// ✅ محاولة خصم عملات (لشراء وسيلة مساعدة). يرجع false إن لم يكن الرصيد كافياً
   bool spendCoins(int amount) {
     if (_coins < amount) return false;
     _coins -= amount;
@@ -358,8 +265,6 @@ class GameState extends ChangeNotifier {
     return true;
   }
 
-  /// ✅ تسجيل أن هذه المرحلة وصل بها المستخدم لهذا العدد من الأسئلة المُجابة
-  /// (لا يتراجع للخلف أبداً - يحفظ فقط أعلى قيمة وصلها) - يغذي شريط التقدم الكلي
   void recordAnsweredProgress(int levelId, int answeredCount) {
     final current = _levelAnsweredCounts[levelId] ?? 0;
     if (answeredCount > current) {
@@ -369,36 +274,24 @@ class GameState extends ChangeNotifier {
     }
   }
 
-  /// ✅✅ تم الإصلاح: حفظ المرحلة المكتملة وفتح المرحلة التالية.
-  /// "المرحلة الحالية" تُحسب دائماً من القائمة الفعلية للمراحل المكتملة/المفتوحة
-  /// (نفس دالة _computeResumeLevel المستخدمة عند تحميل التطبيق)، بدلاً من
-  /// تحديثها يدوياً بأرقام قد تتراجع للخلف عند إعادة لعب مرحلة قديمة.
   void markLevelCompleted(int levelId) {
     if (!_completedLevels.contains(levelId)) {
       _completedLevels.add(levelId);
       GameStorage.saveCompletedLevels(_completedLevels);
     }
-
-    // ✅ تأكيد أن هذه المرحلة تُحتسب كاملة في شريط التقدم الكلي
     final lvl = QuizData.levels.firstWhere((l) => l.id == levelId,
         orElse: () => QuizData.levels.first);
     recordAnsweredProgress(levelId, lvl.questions.length);
-
     final nextId = levelId + 1;
-
-    // فتح المرحلة التالية إن وجدت
     if (nextId <= QuizData.levels.length && !_unlockedLevels.contains(nextId)) {
       _unlockedLevels.add(nextId);
       GameStorage.saveUnlockedLevels(_unlockedLevels);
     }
-
-    // ✅ إعادة حساب المرحلة الحالية من مصدر الحقيقة (لا تتراجع أبداً للخلف)
     final int computed = _computeResumeLevel();
     if (computed != _currentLevel) {
       _currentLevel = computed;
       GameStorage.saveCurrentLevel(_currentLevel);
     }
-
     notifyListeners();
   }
 
@@ -414,9 +307,7 @@ class GameState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// ✅ عدد الأسئلة المُجابة في مرحلة معيّنة (سواء اكتملت أو ما زالت جارية)
   int answeredCountForLevel(int levelId) => _levelAnsweredCounts[levelId] ?? 0;
-
   bool isLevelUnlocked(int id) => _unlockedLevels.contains(id);
   bool isLevelCompleted(int id) => _completedLevels.contains(id);
 
@@ -437,14 +328,12 @@ class GameState extends ChangeNotifier {
 // ============================================================
 class QuizApp extends StatefulWidget {
   const QuizApp({super.key});
-
   @override
   State<QuizApp> createState() => _QuizAppState();
 }
 
 class _QuizAppState extends State<QuizApp> {
   final GameState _gs = GameState();
-
   @override
   void initState() {
     super.initState();
@@ -476,7 +365,6 @@ class _QuizAppState extends State<QuizApp> {
         scaffoldBackgroundColor: AppColors.backgroundLight,
         textTheme: _textTheme(false),
       );
-
   ThemeData _darkTheme() => ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
@@ -484,7 +372,6 @@ class _QuizAppState extends State<QuizApp> {
         scaffoldBackgroundColor: AppColors.backgroundDark,
         textTheme: _textTheme(true),
       );
-
   TextTheme _textTheme(bool dark) {
     final c = dark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
     return TextTheme(
@@ -506,7 +393,6 @@ class _QuizAppState extends State<QuizApp> {
 class SplashScreen extends StatefulWidget {
   final GameState gameState;
   const SplashScreen({super.key, required this.gameState});
-
   @override
   State<SplashScreen> createState() => _SplashScreenState();
 }
@@ -522,6 +408,7 @@ class _SplashScreenState extends State<SplashScreen>
   late final AnimationController _dotsCtrl = AnimationController(
       vsync: this, duration: const Duration(milliseconds: 1200))
     ..repeat();
+
   late final Animation<double> _scaleAnim = Tween<double>(begin: 0.0, end: 1.0)
       .animate(CurvedAnimation(parent: _scaleCtrl, curve: Curves.elasticOut));
   late final Animation<double> _fadeAnim = Tween<double>(begin: 0.0, end: 1.0)
@@ -532,17 +419,26 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   void initState() {
     super.initState();
-    // تهيئة مسبقة للإعلان البيني ليكون جاهزاً عند نهاية أول مرحلة
+
+    // ✅ تهيئة الإعلانات مسبقاً
     AdManager.instance.loadInterstitial();
-    // ✅ تهيئة مسبقة لإعلان المكافأة (مشاهدة إعلان مقابل عملات)
     RewardedAdHelper.load();
+    AdManager.instance.loadAppOpenAd(); // ✅ تحميل إعلان شاشة الفتح
+
     _scaleCtrl.forward();
     Future.delayed(const Duration(milliseconds: 200), () {
       if (!mounted) return;
       _fadeCtrl.forward();
       _rotCtrl.forward();
     });
-    Future.delayed(const Duration(milliseconds: 3200), _goHome);
+
+    // ✅ عرض إعلان شاشة الفتح بعد انتهاء الأنيميشن، ثم الانتقال للرئيسية
+    Future.delayed(const Duration(milliseconds: 3200), () {
+      if (!mounted) return;
+      AdManager.instance.showAppOpenAdIfAvailable(
+        onAdDismissed: _goHome,
+      );
+    });
   }
 
   void _goHome() {
@@ -575,7 +471,6 @@ class _SplashScreenState extends State<SplashScreen>
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const Spacer(flex: 2),
-              // ── أيقونة متحركة ──
               Center(
                 child: ScaleTransition(
                   scale: _scaleAnim,
@@ -602,7 +497,6 @@ class _SplashScreenState extends State<SplashScreen>
                 ),
               ),
               const SizedBox(height: 28),
-              // ─ اسم اللعبة ──
               FadeTransition(
                 opacity: _fadeAnim,
                 child: Column(children: [
@@ -627,7 +521,6 @@ class _SplashScreenState extends State<SplashScreen>
                 ]),
               ),
               const Spacer(flex: 2),
-              // ── شريط تحميل متحرك ─
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 60),
                 child: AnimatedBuilder(
@@ -644,10 +537,9 @@ class _SplashScreenState extends State<SplashScreen>
                 ),
               ),
               const SizedBox(height: 10),
-              Text('جارٍ التحميل...',
+              const Text('جارٍ التحميل...',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                      color: Colors.white.withOpacity(0.6), fontSize: 12)),
+                  style: TextStyle(color: Colors.white70, fontSize: 12)),
               const SizedBox(height: 32),
             ],
           ),
@@ -663,7 +555,6 @@ class _SplashScreenState extends State<SplashScreen>
 class HomeScreen extends StatefulWidget {
   final GameState gameState;
   const HomeScreen({super.key, required this.gameState});
-
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
@@ -678,7 +569,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           CurvedAnimation(parent: _headerCtrl, curve: Curves.easeOutCubic));
   late final Animation<double> _cardsFade = Tween<double>(begin: 0.0, end: 1.0)
       .animate(CurvedAnimation(parent: _cardsCtrl, curve: Curves.easeIn));
-  // ── إعلان البانر في الشاشة الرئيسية ──
+
   BannerAd? _bannerAd;
   bool _bannerReady = false;
 
@@ -687,8 +578,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     super.initState();
     _headerCtrl.forward();
     Future.delayed(const Duration(milliseconds: 300), () {
-      if (!mounted) return;
-      _cardsCtrl.forward();
+      if (mounted) _cardsCtrl.forward();
     });
     _loadBanner();
   }
@@ -698,7 +588,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       onLoaded: () {
         if (mounted) setState(() => _bannerReady = true);
       },
-    )..load();
+    );
   }
 
   @override
@@ -709,7 +599,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     super.dispose();
   }
 
-  // ── helpers ──
   bool get _isDark => widget.gameState.isDarkMode;
   Color get _bg =>
       _isDark ? AppColors.backgroundDark : AppColors.backgroundLight;
@@ -730,80 +619,66 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // ─── شريط علوي ───
                 _buildTopBar(),
                 const SizedBox(height: 20),
-                // ─── بطاقة النقاط ───
                 SlideTransition(
-                  position: _headerSlide,
-                  child: _buildScoreCard(),
-                ),
+                    position: _headerSlide, child: _buildScoreCard()),
                 const SizedBox(height: 22),
-                // ─── إحصاء سريع ───
                 SlideTransition(
-                  position: _headerSlide,
-                  child: _buildQuickStats(),
-                ),
+                    position: _headerSlide, child: _buildQuickStats()),
                 const SizedBox(height: 26),
-                // ─── أزرار الإجراءات ───
                 FadeTransition(
                   opacity: _cardsFade,
                   child: Column(children: [
                     _actionBtn(
-                      icon: Icons.play_arrow_rounded,
-                      title: 'ابدأ اللعبة',
-                      subtitle: 'اختر المرحلة التي تريد اللعب منها',
-                      gradient: AppColors.primaryGradient,
-                      onTap: _startGame,
-                    ),
+                        icon: Icons.play_arrow_rounded,
+                        title: 'ابدأ اللعبة',
+                        subtitle: 'اختر المرحلة التي تريد اللعب منها',
+                        gradient: AppColors.primaryGradient,
+                        onTap: _startGame),
                     const SizedBox(height: 14),
                     _actionBtn(
-                      icon: Icons.grid_view_rounded,
-                      title: 'اختيار المرحلة',
-                      subtitle:
-                          '${widget.gameState.unlockedLevels.length} مراحل مفتوحة من ${QuizData.levels.length}',
-                      gradient: LinearGradient(colors: [
-                        AppColors.secondaryDark,
-                        AppColors.secondaryDark.withOpacity(0.7)
-                      ]),
-                      onTap: _openLevels,
-                    ),
+                        icon: Icons.grid_view_rounded,
+                        title: 'اختيار المرحلة',
+                        subtitle:
+                            '${widget.gameState.unlockedLevels.length} مراحل مفتوحة من ${QuizData.levels.length}',
+                        gradient: LinearGradient(colors: [
+                          AppColors.secondaryDark,
+                          AppColors.secondaryDark.withOpacity(0.7)
+                        ]),
+                        onTap: _openLevels),
                     const SizedBox(height: 14),
                     _actionBtn(
-                      icon: Icons.leaderboard_rounded,
-                      title: 'لوحة التقدم',
-                      subtitle: 'شاهد تقدمك في المراحل',
-                      gradient: LinearGradient(colors: [
-                        const Color(0xFFFF6D00),
-                        const Color(0xFFFF9800)
-                      ]),
-                      onTap: _openProgress,
-                    ),
+                        icon: Icons.leaderboard_rounded,
+                        title: 'لوحة التقدم',
+                        subtitle: 'شاهد تقدمك في المراحل',
+                        gradient: const LinearGradient(
+                            colors: [Color(0xFFFF6D00), Color(0xFFFF9800)]),
+                        onTap: _openProgress),
                     const SizedBox(height: 14),
                     _actionBtn(
-                      icon: Icons.privacy_tip_rounded,
-                      title: 'سياسة الخصوصية',
-                      subtitle: 'اقرأ سياسة حماية بياناتك',
-                      gradient: LinearGradient(
-                          colors: [Colors.grey.shade700, Colors.grey.shade900]),
-                      onTap: _openPrivacy,
-                    ),
+                        icon: Icons.privacy_tip_rounded,
+                        title: 'سياسة الخصوصية',
+                        subtitle: 'اقرأ سياسة حماية بياناتك',
+                        gradient: LinearGradient(colors: [
+                          Colors.grey.shade700,
+                          Colors.grey.shade900
+                        ]),
+                        onTap: _openPrivacy),
                     const SizedBox(height: 18),
-                    // أزرار صغيرة
                     Row(children: [
                       Expanded(
-                        child: _smallBtn(Icons.refresh_rounded, 'إعادة ضبط',
-                            AppColors.wrongColor, _confirmReset),
-                      ),
+                          child: _smallBtn(Icons.refresh_rounded, 'إعادة ضبط',
+                              AppColors.wrongColor, _confirmReset)),
                       const SizedBox(width: 10),
                       Expanded(
-                        child: _smallBtn(Icons.info_outline_rounded,
-                            'عن اللعبة', AppColors.primaryDark, _showAbout),
-                      ),
+                          child: _smallBtn(Icons.info_outline_rounded,
+                              'عن اللعبة', AppColors.primaryDark, _showAbout)),
                     ]),
                   ]),
                 ),
-                // ─── إعلان البانر (يظهر فقط بعد التحميل بنجاح) ──
+
+                // ✅ عرض إعلان البانر
                 if (_bannerReady && _bannerAd != null) ...[
                   const SizedBox(height: 18),
                   Container(
@@ -821,7 +696,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  // ── شريط علوي ──
   Widget _buildTopBar() => Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -835,16 +709,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               decoration: BoxDecoration(
                   color: _card, borderRadius: BorderRadius.circular(12)),
               child: Icon(
-                _isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
-                color: AppColors.primaryDark,
-                size: 20,
-              ),
+                  _isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+                  color: AppColors.primaryDark,
+                  size: 20),
             ),
           ),
         ],
       );
 
-  // ── بطاقة النقاط ──
   Widget _buildScoreCard() => Container(
         padding: const EdgeInsets.all(22),
         decoration: BoxDecoration(
@@ -873,13 +745,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   fontWeight: FontWeight.bold,
                   height: 1.1)),
           const SizedBox(height: 8),
-          // ✅ رصيد العملات (تُستخدم لشراء وسائل المساعدة)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.18),
-              borderRadius: BorderRadius.circular(20),
-            ),
+                color: Colors.white.withOpacity(0.18),
+                borderRadius: BorderRadius.circular(20)),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
               const Text('🪙', style: TextStyle(fontSize: 14)),
               const SizedBox(width: 5),
@@ -915,11 +785,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 TextStyle(color: Colors.white.withOpacity(0.75), fontSize: 10)),
       ]);
 
-  // ── إحصاء سريع ──
   Widget _buildQuickStats() {
     final total = QuizData.levels.fold(0, (s, l) => s + l.questions.length);
-    // ✅ يشمل الآن الأسئلة المُجابة ضمن مرحلة لم تكتمل بعد أيضاً، وليس فقط
-    // المراحل المكتملة بالكامل — وهذا ما كان يمنع الشريط من التحرك سابقاً.
     final answered = widget.gameState.totalAnsweredQuestions;
     final pct = total == 0 ? 0.0 : answered / total;
     return Container(
@@ -954,14 +821,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  // ── زر إجراء رئيسي ──
-  Widget _actionBtn({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required LinearGradient gradient,
-    required VoidCallback onTap,
-  }) =>
+  Widget _actionBtn(
+          {required IconData icon,
+          required String title,
+          required String subtitle,
+          required LinearGradient gradient,
+          required VoidCallback onTap}) =>
       GestureDetector(
         onTap: onTap,
         child: Container(
@@ -978,35 +843,32 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ),
           child: Row(children: [
             Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(14)),
-              child: Icon(icon, color: Colors.white, size: 24),
-            ),
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(14)),
+                child: Icon(icon, color: Colors.white, size: 24)),
             const SizedBox(width: 14),
             Expanded(
                 child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title,
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 17,
-                        fontWeight: FontWeight.bold)),
-                Text(subtitle,
-                    style: TextStyle(
-                        color: Colors.white.withOpacity(0.8), fontSize: 12)),
-              ],
-            )),
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                  Text(title,
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold)),
+                  Text(subtitle,
+                      style: TextStyle(
+                          color: Colors.white.withOpacity(0.8), fontSize: 12)),
+                ])),
             Icon(Icons.arrow_forward_ios_rounded,
                 color: Colors.white.withOpacity(0.7), size: 16),
           ]),
         ),
       );
 
-  // ── زر صغير ─
   Widget _smallBtn(
           IconData ic, String label, Color color, VoidCallback onTap) =>
       GestureDetector(
@@ -1014,10 +876,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 13),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.12),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: color.withOpacity(0.3)),
-          ),
+              color: color.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: color.withOpacity(0.3))),
           child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
             Icon(ic, color: color, size: 17),
             const SizedBox(width: 7),
@@ -1028,18 +889,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         ),
       );
 
-  // ── تنقل ──
-  // ✅ تم التعديل بناءً على طلب المستخدم: زر "ابدأ اللعبة" لم يعد يخمّن
-  // المرحلة التي وصلت إليها تلقائياً (لتفادي أي خلل مستقبلي في الحساب).
-  // بدلاً من ذلك يفتح مباشرة شاشة "اختيار المرحلة" ليختار المستخدم بنفسه
-  // من وين يريد أن يكمل.
-  void _startGame() {
-    Navigator.push(
-      context,
-      _route(LevelSelectorScreen(gameState: widget.gameState)),
-    );
-  }
-
+  void _startGame() => Navigator.push(
+      context, _route(LevelSelectorScreen(gameState: widget.gameState)));
   void _openLevels() => Navigator.push(
       context, _route(LevelSelectorScreen(gameState: widget.gameState)));
   void _openProgress() => Navigator.push(
@@ -1065,9 +916,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               const Text('سيتم حذف جميع نقاطك ومراحلك المفتوحة. هل أنت متأكد؟'),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('إلغاء'),
-            ),
+                onPressed: () => Navigator.pop(context),
+                child: const Text('إلغاء')),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.wrongColor),
@@ -1100,14 +950,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppColors.primaryDark.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
+                  color: AppColors.primaryDark.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12)),
               child: Text(
-                '${QuizData.levels.length} مراحل • ${QuizData.levels.fold(0, (s, l) => s + l.questions.length)} سؤالاً متنوعاً\nعلوم • جغرافيا • تاريخ • تقنية\nرياضة • طبيعة • فضاء • فن • طب • دين • ألغاز • أعلام',
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 12, height: 1.6),
-              ),
+                  '${QuizData.levels.length} مراحل • ${QuizData.levels.fold(0, (s, l) => s + l.questions.length)} سؤالاً متنوعاً\nعلوم • جغرافيا • تاريخ • تقنية\nرياضة • طبيعة • فضاء • فن • طب • دين • ألغاز • أعلام',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 12, height: 1.6)),
             ),
           ]),
           actions: [
@@ -1130,16 +978,12 @@ class LevelSelectorScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = gameState.isDarkMode;
     final bg = isDark ? AppColors.backgroundDark : AppColors.backgroundLight;
-    final card = isDark ? AppColors.cardDark : AppColors.cardLight;
-    final txt = isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
-    final sub = isDark ? AppColors.textSecDark : AppColors.textSecLight;
     return Scaffold(
       backgroundColor: bg,
       appBar: _appBar('اختر مرحلتك', isDark),
       body: AnimatedBuilder(
         animation: gameState,
         builder: (_, __) {
-          // ✅ أول مرحلة مفتوحة وغير مكتملة = "أين وصلت"
           QuizLevel? resumeLevel;
           for (final lvl in QuizData.levels) {
             if (gameState.isLevelUnlocked(lvl.id) &&
@@ -1148,13 +992,11 @@ class LevelSelectorScreen extends StatelessWidget {
               break;
             }
           }
-
           return Padding(
             padding: const EdgeInsets.all(14),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // ── بطاقة "أين وصلت" مع زر متابعة مباشر ──
                 if (resumeLevel != null)
                   Container(
                     margin: const EdgeInsets.only(bottom: 14),
@@ -1171,21 +1013,19 @@ class LevelSelectorScreen extends StatelessWidget {
                     ),
                     child: Row(children: [
                       Container(
-                        width: 52,
-                        height: 52,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: Center(
-                            child: Text(resumeLevel.icon,
-                                style: const TextStyle(fontSize: 26))),
-                      ),
+                          width: 52,
+                          height: 52,
+                          decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(14)),
+                          child: Center(
+                              child: Text(resumeLevel.icon,
+                                  style: const TextStyle(fontSize: 26)))),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
+                          child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
                             Text('وصلت إلى المرحلة ${resumeLevel.id}',
                                 style: const TextStyle(
                                     color: Colors.white,
@@ -1196,26 +1036,23 @@ class LevelSelectorScreen extends StatelessWidget {
                                     color: Colors.white.withOpacity(0.85),
                                     fontSize: 15,
                                     fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                      ),
+                          ])),
                       GestureDetector(
                         onTap: () {
                           gameState.setCurrentLevel(resumeLevel!.id);
                           Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) => QuizScreen(
-                                    level: resumeLevel!, gameState: gameState)),
-                          );
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => QuizScreen(
+                                      level: resumeLevel!,
+                                      gameState: gameState)));
                         },
                         child: Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 16, vertical: 10),
                           decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12)),
                           child: Text('تابع',
                               style: TextStyle(
                                   color: AppColors.primaryDark,
@@ -1230,31 +1067,28 @@ class LevelSelectorScreen extends StatelessWidget {
                     margin: const EdgeInsets.only(bottom: 14),
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      gradient: AppColors.goldGradient,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(children: [
-                      const Text('👑', style: TextStyle(fontSize: 30)),
+                        gradient: AppColors.goldGradient,
+                        borderRadius: BorderRadius.circular(20)),
+                    child: const Row(children: [
+                      Text('👑', style: TextStyle(fontSize: 30)),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: Text('أكملت جميع المراحل! يمكنك إعادة أي مرحلة.',
-                            style: const TextStyle(
-                                color: Colors.black,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13)),
-                      ),
+                          child: Text(
+                              'أكملت جميع المراحل! يمكنك إعادة أي مرحلة.',
+                              style: TextStyle(
+                                  color: Colors.black,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13))),
                     ]),
                   ),
-                // ── شبكة كل المراحل (للاختيار الحر أو المراجعة) ──
                 Expanded(
                   child: GridView.builder(
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing: 12,
-                      childAspectRatio: 0.82,
-                    ),
+                            crossAxisCount: 2,
+                            crossAxisSpacing: 12,
+                            mainAxisSpacing: 12,
+                            childAspectRatio: 0.82),
                     itemCount: QuizData.levels.length,
                     itemBuilder: (ctx, i) {
                       final lvl = QuizData.levels[i];
@@ -1265,11 +1099,10 @@ class LevelSelectorScreen extends StatelessWidget {
                         onTap: unlocked
                             ? () {
                                 Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                      builder: (_) => QuizScreen(
-                                          level: lvl, gameState: gameState)),
-                                );
+                                    context,
+                                    MaterialPageRoute(
+                                        builder: (_) => QuizScreen(
+                                            level: lvl, gameState: gameState)));
                               }
                             : () => _lockedSnack(context, lvl),
                         child: AnimatedContainer(
@@ -1283,10 +1116,8 @@ class LevelSelectorScreen extends StatelessWidget {
                                       ],
                                     begin: Alignment.topLeft,
                                     end: Alignment.bottomRight)
-                                : LinearGradient(colors: [
-                                    Colors.grey.shade800,
-                                    Colors.grey.shade700
-                                  ]),
+                                : const LinearGradient(
+                                    colors: [Colors.grey, Colors.grey]),
                             borderRadius: BorderRadius.circular(22),
                             border: isCurrent
                                 ? Border.all(
@@ -1304,31 +1135,27 @@ class LevelSelectorScreen extends StatelessWidget {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              // ── أيقونة + تراكب ──
                               Stack(alignment: Alignment.center, children: [
                                 Text(lvl.icon,
                                     style: const TextStyle(fontSize: 38)),
                                 if (!unlocked)
                                   Container(
-                                    width: 50,
-                                    height: 50,
-                                    color: Colors.black.withOpacity(0.45),
-                                    child: const Icon(Icons.lock_rounded,
-                                        color: Colors.white70, size: 26),
-                                  ),
+                                      width: 50,
+                                      height: 50,
+                                      color: Colors.black.withOpacity(0.45),
+                                      child: const Icon(Icons.lock_rounded,
+                                          color: Colors.white70, size: 26)),
                                 if (completed)
                                   Positioned(
-                                    top: -2,
-                                    left: -2,
-                                    child: Container(
-                                      padding: const EdgeInsets.all(3),
-                                      decoration: const BoxDecoration(
-                                          color: AppColors.correctColor,
-                                          shape: BoxShape.circle),
-                                      child: const Icon(Icons.check,
-                                          color: Colors.white, size: 12),
-                                    ),
-                                  ),
+                                      top: -2,
+                                      left: -2,
+                                      child: Container(
+                                          padding: const EdgeInsets.all(3),
+                                          decoration: const BoxDecoration(
+                                              color: AppColors.correctColor,
+                                              shape: BoxShape.circle),
+                                          child: const Icon(Icons.check,
+                                              color: Colors.white, size: 12))),
                               ]),
                               const SizedBox(height: 8),
                               Text('المرحلة ${lvl.id}',
@@ -1342,21 +1169,19 @@ class LevelSelectorScreen extends StatelessWidget {
                                       fontSize: 13,
                                       fontWeight: FontWeight.bold)),
                               const SizedBox(height: 6),
-                              // ── شارات ──
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  if (isCurrent)
-                                    _chip('▶ حالية', AppColors.goldColor,
-                                        Colors.black),
-                                  if (completed)
-                                    _chip('✓ مكتملة', AppColors.correctColor,
-                                        Colors.white),
-                                  if (!unlocked)
-                                    _chip('مقفلة', Colors.white24,
-                                        Colors.white70),
-                                ],
-                              ),
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    if (isCurrent)
+                                      _chip('▶ حالية', AppColors.goldColor,
+                                          Colors.black),
+                                    if (completed)
+                                      _chip('✓ مكتملة', AppColors.correctColor,
+                                          Colors.white),
+                                    if (!unlocked)
+                                      _chip('مقفلة', Colors.white24,
+                                          Colors.white70),
+                                  ]),
                               const SizedBox(height: 4),
                               Text('${lvl.questions.length} سؤال',
                                   style: TextStyle(
@@ -1412,6 +1237,7 @@ class ProgressScreen extends StatelessWidget {
     final sub = isDark ? AppColors.textSecDark : AppColors.textSecLight;
     final totalQuestions =
         QuizData.levels.fold(0, (s, l) => s + l.questions.length);
+
     return Scaffold(
       backgroundColor: bg,
       appBar: _appBar('لوحة التقدم', isDark),
@@ -1420,29 +1246,25 @@ class ProgressScreen extends StatelessWidget {
         builder: (_, __) => ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            // ─ ملخص عام ──
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                gradient: AppColors.primaryGradient,
-                borderRadius: BorderRadius.circular(22),
-              ),
+                  gradient: AppColors.primaryGradient,
+                  borderRadius: BorderRadius.circular(22)),
               child: Column(children: [
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _summaryItem(
-                        '🏆', '${gameState.totalScore}', 'إجمالي النقاط'),
-                    _summaryItem('✅', '${gameState.completedLevels.length}',
-                        'مراحل مكتملة'),
-                    _summaryItem('🔓', '${gameState.unlockedLevels.length}',
-                        'مراحل مفتوحة'),
-                  ],
-                ),
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _summaryItem(
+                          '🏆', '${gameState.totalScore}', 'إجمالي النقاط'),
+                      _summaryItem('✅', '${gameState.completedLevels.length}',
+                          'مراحل مكتملة'),
+                      _summaryItem('🔓', '${gameState.unlockedLevels.length}',
+                          'مراحل مفتوحة'),
+                    ]),
                 const SizedBox(height: 14),
                 Divider(color: Colors.white.withOpacity(0.25), height: 1),
                 const SizedBox(height: 14),
-                // ✅ إجمالي الأسئلة المُجابة (يشمل المراحل الجارية غير المكتملة)
                 Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -1477,11 +1299,9 @@ class ProgressScreen extends StatelessWidget {
                 style: TextStyle(
                     color: txt, fontSize: 17, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
-            // ── قائمة المراحل ──
             ...QuizData.levels.map((lvl) {
               final unlocked = gameState.isLevelUnlocked(lvl.id);
               final completed = gameState.isLevelCompleted(lvl.id);
-              // ✅ نسبة فعلية لكل مرحلة، تشمل المراحل الجارية غير المكتملة أيضاً
               final answeredInLevel = gameState.answeredCountForLevel(lvl.id);
               final progress = completed
                   ? 1.0
@@ -1496,31 +1316,28 @@ class ProgressScreen extends StatelessWidget {
                   color: card,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: completed
-                        ? AppColors.correctColor.withOpacity(0.5)
-                        : unlocked
-                            ? lvl.color.withOpacity(0.3)
-                            : Colors.grey.withOpacity(0.2),
-                  ),
+                      color: completed
+                          ? AppColors.correctColor.withOpacity(0.5)
+                          : unlocked
+                              ? lvl.color.withOpacity(0.3)
+                              : Colors.grey.withOpacity(0.2)),
                 ),
                 child: Row(children: [
                   Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: (unlocked ? lvl.color : Colors.grey)
-                          .withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Center(
-                        child: Text(unlocked ? lvl.icon : '🔒',
-                            style: const TextStyle(fontSize: 22))),
-                  ),
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                          color: (unlocked ? lvl.color : Colors.grey)
+                              .withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(12)),
+                      child: Center(
+                          child: Text(unlocked ? lvl.icon : '🔒',
+                              style: const TextStyle(fontSize: 22)))),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
                         Row(children: [
                           Text(lvl.title,
                               style: TextStyle(
@@ -1558,30 +1375,28 @@ class ProgressScreen extends StatelessWidget {
                                 completed ? AppColors.correctColor : lvl.color),
                           ),
                         ),
-                      ],
-                    ),
-                  ),
+                      ])),
                 ]),
               );
             }),
             const SizedBox(height: 8),
-            // ── نصيحة ─
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: AppColors.goldColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppColors.goldColor.withOpacity(0.3)),
-              ),
-              child: Row(children: [
-                const Text('', style: TextStyle(fontSize: 20)),
-                const SizedBox(width: 10),
+                  color: AppColors.goldColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(14),
+                  border:
+                      Border.all(color: AppColors.goldColor.withOpacity(0.3))),
+              child: const Row(children: [
+                Text('💡', style: TextStyle(fontSize: 20)),
+                SizedBox(width: 10),
                 Expanded(
-                  child: Text(
-                    'أكمل المراحل بالتسلسل لفتح مراحل جديدة.\nكل إجابة صحيحة = 10 نقاط',
-                    style: TextStyle(color: sub, fontSize: 12, height: 1.5),
-                  ),
-                ),
+                    child: Text(
+                        'أكمل المراحل بالتسلسل لفتح مراحل جديدة.\nكل إجابة صحيحة = 10 نقاط',
+                        style: TextStyle(
+                            color: AppColors.textSecDark,
+                            fontSize: 12,
+                            height: 1.5))),
               ]),
             ),
           ],
@@ -1612,7 +1427,6 @@ class QuizScreen extends StatefulWidget {
   final QuizLevel level;
   final GameState gameState;
   const QuizScreen({super.key, required this.level, required this.gameState});
-
   @override
   State<QuizScreen> createState() => _QuizScreenState();
 }
@@ -1623,9 +1437,9 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   int? _selected;
   bool _answered = false;
   bool _isDisposed = false;
-  // ✅ وسائل المساعدة: أرقام الإجابات المحذوفة بواسطة 50/50 لهذا السؤال
   Set<int> _eliminated = {};
   bool _watchingAd = false;
+
   late final AnimationController _qCtrl = AnimationController(
       vsync: this, duration: const Duration(milliseconds: 450));
   late final AnimationController _resCtrl = AnimationController(
@@ -1647,7 +1461,6 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
     _restoreProgressThenStart();
   }
 
-  /// ✅ استرجاع تقدم هذه المرحلة المحفوظ (إن وُجد) قبل بدء أول سؤال
   Future<void> _restoreProgressThenStart() async {
     final prog = await GameStorage.getLevelProgress();
     if (prog != null && prog['levelId'] == widget.level.id && !_isDisposed) {
@@ -1664,7 +1477,6 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
     _startQuestion();
   }
 
-  /// ✅ حفظ مكان التوقف الحالي (رقم السؤال ونقاط المرحلة) فوراً
   void _persistProgress() {
     GameStorage.saveLevelProgress(widget.level.id, _qIdx, _levelScore);
   }
@@ -1704,9 +1516,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
       widget.gameState.addScore(10);
       _levelScore += 10;
     }
-    // ✅ تحديث شريط التقدم الكلي فوراً بعدد الأسئلة المُجابة بهذه المرحلة
     widget.gameState.recordAnsweredProgress(widget.level.id, _qIdx + 1);
-    // ✅ نحفظ فوراً حتى لو أُغلق التطبيق خلال الثواني القليلة القادمة
     _persistProgress();
     Future.delayed(const Duration(milliseconds: 1900), () {
       if (!mounted) return;
@@ -1718,14 +1528,12 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
     });
   }
 
-  /// ✅ وسيلة مساعدة: حذف إجابتين خاطئتين مقابل 10 عملات
   void _use5050() {
     if (_answered || _eliminated.isNotEmpty) return;
     if (!widget.gameState.spendCoins(10)) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('لا تملك عملات كافية 🪙 (تحتاج 10)'),
-        behavior: SnackBarBehavior.floating,
-      ));
+          content: Text('لا تملك عملات كافية 🪙 (تحتاج 10)'),
+          behavior: SnackBarBehavior.floating));
       return;
     }
     final wrongIndices = List.generate(_q.options.length, (i) => i)
@@ -1737,27 +1545,23 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
     });
   }
 
-  /// ✅ مشاهدة إعلان مكافأة مقابل 10 عملات مجانية
   void _watchAdForCoins() {
     if (_watchingAd) return;
     if (!RewardedAdHelper.isReady) {
       RewardedAdHelper.load();
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('الإعلان غير جاهز بعد، حاول خلال ثوانٍ 🎬'),
-        behavior: SnackBarBehavior.floating,
-      ));
+          content: Text('الإعلان غير جاهز بعد، حاول خلال ثوانٍ 🎬'),
+          behavior: SnackBarBehavior.floating));
       return;
     }
     setState(() => _watchingAd = true);
     RewardedAdHelper.show(
       onReward: () {
         widget.gameState.addCoins(10);
-        if (mounted) {
+        if (mounted)
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('+10 عملات 🪙 شكراً لمشاهدتك!'),
-            behavior: SnackBarBehavior.floating,
-          ));
-        }
+              content: Text('+10 عملات 🪙 شكراً لمشاهدتك!'),
+              behavior: SnackBarBehavior.floating));
       },
       onDismissed: () {
         if (mounted) setState(() => _watchingAd = false);
@@ -1778,13 +1582,11 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
       _answered = false;
       _eliminated = {};
     });
-    // ✅ حفظ رقم السؤال الجديد فوراً كنقطة استكمال
     _persistProgress();
     _startQuestion();
   }
 
   void _showComplete() {
-    // ✅ المرحلة انتهت، لا حاجة لحفظ نقطة استكمال بعد الآن
     GameStorage.clearLevelProgress();
     widget.gameState.markLevelCompleted(widget.level.id);
     AdManager.instance.showInterstitial(onDismissed: () {
@@ -1814,7 +1616,6 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   }
 
   void _restart() {
-    // ✅ إعادة المرحلة من الصفر تعني مسح نقطة الاستكمال القديمة أيضاً
     GameStorage.saveLevelProgress(widget.level.id, 0, 0);
     setState(() {
       _qIdx = 0;
@@ -1840,10 +1641,10 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
     }
     widget.gameState.setCurrentLevel(nextId);
     Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-          builder: (_) => QuizScreen(level: next, gameState: widget.gameState)),
-    );
+        context,
+        MaterialPageRoute(
+            builder: (_) =>
+                QuizScreen(level: next, gameState: widget.gameState)));
   }
 
   bool get _isDark => widget.gameState.isDarkMode;
@@ -1867,12 +1668,10 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
             _buildProgressAndTimer(),
             const SizedBox(height: 16),
             Expanded(
-              child: SlideTransition(
-                position: _qSlide,
-                child: FadeTransition(
-                    opacity: _qFade, child: _buildQuestionCard()),
-              ),
-            ),
+                child: SlideTransition(
+                    position: _qSlide,
+                    child: FadeTransition(
+                        opacity: _qFade, child: _buildQuestionCard()))),
             const SizedBox(height: 12),
             _buildHintsRow(),
             const SizedBox(height: 10),
@@ -1883,63 +1682,55 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
     );
   }
 
-  // ── صف وسائل المساعدة ──
   Widget _buildHintsRow() {
     final canUse5050 = !_answered && _eliminated.isEmpty;
     return Row(children: [
       Expanded(
-        child: _hintChip(
-          icon: Icons.remove_red_eye_outlined,
-          label: '50/50',
-          costLabel: '10 🪙',
-          enabled: canUse5050,
-          onTap: _use5050,
-        ),
-      ),
+          child: _hintChip(
+              icon: Icons.remove_red_eye_outlined,
+              label: '50/50',
+              costLabel: '10 🪙',
+              enabled: canUse5050,
+              onTap: _use5050)),
       const SizedBox(width: 10),
       Expanded(
-        child: _hintChip(
-          icon: Icons.play_circle_outline_rounded,
-          label: _watchingAd ? 'جارٍ التحميل...' : 'مشاهدة إعلان',
-          costLabel: '+10 🪙',
-          enabled: !_answered && !_watchingAd,
-          onTap: _watchAdForCoins,
-          isReward: true,
-        ),
-      ),
+          child: _hintChip(
+              icon: Icons.play_circle_outline_rounded,
+              label: _watchingAd ? 'جارٍ التحميل...' : 'مشاهدة إعلان',
+              costLabel: '+10 🪙',
+              enabled: !_answered && !_watchingAd,
+              onTap: _watchAdForCoins,
+              isReward: true)),
     ]);
   }
 
-  Widget _hintChip({
-    required IconData icon,
-    required String label,
-    required String costLabel,
-    required bool enabled,
-    required VoidCallback onTap,
-    bool isReward = false,
-  }) {
+  Widget _hintChip(
+      {required IconData icon,
+      required String label,
+      required String costLabel,
+      required bool enabled,
+      required VoidCallback onTap,
+      bool isReward = false}) {
     final color = isReward ? AppColors.secondaryDark : widget.level.color;
     return GestureDetector(
       onTap: enabled ? onTap : null,
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
         decoration: BoxDecoration(
-          color: (enabled ? color : Colors.grey).withOpacity(0.12),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-              color: (enabled ? color : Colors.grey).withOpacity(0.35)),
-        ),
+            color: (enabled ? color : Colors.grey).withOpacity(0.12),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+                color: (enabled ? color : Colors.grey).withOpacity(0.35))),
         child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
           Icon(icon, size: 16, color: enabled ? color : Colors.grey),
           const SizedBox(width: 6),
           Flexible(
-            child: Text(label,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                    color: enabled ? _txt : Colors.grey,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600)),
-          ),
+              child: Text(label,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      color: enabled ? _txt : Colors.grey,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600))),
           const SizedBox(width: 5),
           Text(costLabel,
               style: TextStyle(
@@ -1955,14 +1746,12 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
         GestureDetector(
           onTap: () => Navigator.pop(context),
           child: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: widget.level.color.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(Icons.arrow_back_ios_rounded,
-                color: widget.level.color, size: 18),
-          ),
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                  color: widget.level.color.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(12)),
+              child: Icon(Icons.arrow_back_ios_rounded,
+                  color: widget.level.color, size: 18)),
         ),
         const SizedBox(width: 10),
         Expanded(
@@ -1975,52 +1764,46 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
               style: TextStyle(color: widget.level.color, fontSize: 12)),
         ])),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            gradient: AppColors.goldGradient,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Row(children: [
-            const Text('🏆', style: TextStyle(fontSize: 12)),
-            const SizedBox(width: 4),
-            Text('${widget.gameState.totalScore}',
-                style: const TextStyle(
-                    color: Colors.black,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13)),
-          ]),
-        ),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+                gradient: AppColors.goldGradient,
+                borderRadius: BorderRadius.circular(20)),
+            child: Row(children: [
+              const Text('🏆', style: TextStyle(fontSize: 12)),
+              const SizedBox(width: 4),
+              Text('${widget.gameState.totalScore}',
+                  style: const TextStyle(
+                      color: Colors.black,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13)),
+            ])),
         const SizedBox(width: 8),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: AppColors.secondaryDark.withOpacity(0.15),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppColors.secondaryDark.withOpacity(0.4)),
-          ),
-          child: Row(children: [
-            const Text('🪙', style: TextStyle(fontSize: 12)),
-            const SizedBox(width: 4),
-            Text('${widget.gameState.coins}',
-                style: TextStyle(
-                    color: _txt, fontWeight: FontWeight.bold, fontSize: 13)),
-          ]),
-        ),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+                color: AppColors.secondaryDark.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                    color: AppColors.secondaryDark.withOpacity(0.4))),
+            child: Row(children: [
+              const Text('🪙', style: TextStyle(fontSize: 12)),
+              const SizedBox(width: 4),
+              Text('${widget.gameState.coins}',
+                  style: TextStyle(
+                      color: _txt, fontWeight: FontWeight.bold, fontSize: 13)),
+            ])),
       ]);
 
   Widget _buildProgressAndTimer() => Column(children: [
         Row(children: [
           Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: LinearProgressIndicator(
-                value: (_qIdx + 1) / _total,
-                minHeight: 6,
-                backgroundColor: widget.level.color.withOpacity(0.15),
-                valueColor: AlwaysStoppedAnimation(widget.level.color),
-              ),
-            ),
-          ),
+              child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: LinearProgressIndicator(
+                      value: (_qIdx + 1) / _total,
+                      minHeight: 6,
+                      backgroundColor: widget.level.color.withOpacity(0.15),
+                      valueColor: AlwaysStoppedAnimation(widget.level.color)))),
           const SizedBox(width: 10),
           Text('${((_qIdx + 1) / _total * 100).toStringAsFixed(0)}%',
               style: TextStyle(
@@ -2046,18 +1829,15 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                           isWarning ? FontWeight.bold : FontWeight.normal)),
               const SizedBox(width: 8),
               Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: 1 - _timerCtrl.value,
-                    minHeight: 4,
-                    backgroundColor: Colors.grey.withOpacity(0.2),
-                    valueColor: AlwaysStoppedAnimation(isWarning
-                        ? AppColors.wrongColor
-                        : AppColors.secondaryDark),
-                  ),
-                ),
-              ),
+                  child: ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                          value: 1 - _timerCtrl.value,
+                          minHeight: 4,
+                          backgroundColor: Colors.grey.withOpacity(0.2),
+                          valueColor: AlwaysStoppedAnimation(isWarning
+                              ? AppColors.wrongColor
+                              : AppColors.secondaryDark)))),
             ]);
           },
         ),
@@ -2067,17 +1847,16 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
         width: double.infinity,
         padding: const EdgeInsets.all(22),
         decoration: BoxDecoration(
-          color: _card,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(
-              color: widget.level.color.withOpacity(0.3), width: 1.5),
-          boxShadow: [
-            BoxShadow(
-                color: widget.level.color.withOpacity(0.08),
-                blurRadius: 18,
-                spreadRadius: 2)
-          ],
-        ),
+            color: _card,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+                color: widget.level.color.withOpacity(0.3), width: 1.5),
+            boxShadow: [
+              BoxShadow(
+                  color: widget.level.color.withOpacity(0.08),
+                  blurRadius: 18,
+                  spreadRadius: 2)
+            ]),
         child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
           Text(widget.level.icon, style: const TextStyle(fontSize: 36)),
           const SizedBox(height: 14),
@@ -2095,16 +1874,15 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
               child: Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: (_selected == _q.correctIndex
-                          ? AppColors.correctColor
-                          : AppColors.wrongColor)
-                      .withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                      color: _selected == _q.correctIndex
-                          ? AppColors.correctColor
-                          : AppColors.wrongColor),
-                ),
+                    color: (_selected == _q.correctIndex
+                            ? AppColors.correctColor
+                            : AppColors.wrongColor)
+                        .withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                        color: _selected == _q.correctIndex
+                            ? AppColors.correctColor
+                            : AppColors.wrongColor)),
                 child: Column(children: [
                   Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                     Text(_selected == _q.correctIndex ? '✅' : '❌',
@@ -2158,6 +1936,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
         borderColor = Colors.grey.withOpacity(0.25);
         bgColor = Colors.transparent;
       }
+
       return Padding(
         padding: const EdgeInsets.only(bottom: 9),
         child: GestureDetector(
@@ -2166,44 +1945,38 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
             duration: const Duration(milliseconds: 280),
             padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 14),
             decoration: BoxDecoration(
-              color: bgColor,
-              borderRadius: BorderRadius.circular(16),
-              border:
-                  Border.all(color: borderColor, width: isSelected ? 2 : 1.5),
-              boxShadow: isSelected
-                  ? [
-                      BoxShadow(
-                          color: borderColor.withOpacity(0.25), blurRadius: 8)
-                    ]
-                  : null,
-            ),
+                color: bgColor,
+                borderRadius: BorderRadius.circular(16),
+                border:
+                    Border.all(color: borderColor, width: isSelected ? 2 : 1.5),
+                boxShadow: isSelected
+                    ? [
+                        BoxShadow(
+                            color: borderColor.withOpacity(0.25), blurRadius: 8)
+                      ]
+                    : null),
             child: Row(children: [
               Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: (_answered && isCorrect)
-                      ? AppColors.correctColor
-                      : (_answered && isWrong)
-                          ? AppColors.wrongColor
-                          : AppColors.primaryDark
-                              .withOpacity(isEliminated ? 0.06 : 0.15),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Center(
-                  child: Text(
-                    String.fromCharCode(0x0041 + i),
-                    style: TextStyle(
-                        color: (_answered && (isCorrect || isWrong))
-                            ? Colors.white
-                            : (isEliminated
-                                ? Colors.grey
-                                : AppColors.primaryDark),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13),
-                  ),
-                ),
-              ),
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                      color: (_answered && isCorrect)
+                          ? AppColors.correctColor
+                          : (_answered && isWrong)
+                              ? AppColors.wrongColor
+                              : AppColors.primaryDark
+                                  .withOpacity(isEliminated ? 0.06 : 0.15),
+                      borderRadius: BorderRadius.circular(8)),
+                  child: Center(
+                      child: Text(String.fromCharCode(0x0041 + i),
+                          style: TextStyle(
+                              color: (_answered && (isCorrect || isWrong))
+                                  ? Colors.white
+                                  : (isEliminated
+                                      ? Colors.grey
+                                      : AppColors.primaryDark),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13)))),
               const SizedBox(width: 12),
               Expanded(
                   child: Text(isEliminated ? 'تم استبعادها' : _q.options[i],
@@ -2241,17 +2014,16 @@ class LevelCompleteDialog extends StatelessWidget {
   final int levelId;
   final GameState gameState;
   final VoidCallback onRetry, onHome, onNext;
-  const LevelCompleteDialog({
-    super.key,
-    required this.levelScore,
-    required this.levelTitle,
-    required this.totalScore,
-    required this.levelId,
-    required this.gameState,
-    required this.onRetry,
-    required this.onHome,
-    required this.onNext,
-  });
+  const LevelCompleteDialog(
+      {super.key,
+      required this.levelScore,
+      required this.levelTitle,
+      required this.totalScore,
+      required this.levelId,
+      required this.gameState,
+      required this.onRetry,
+      required this.onHome,
+      required this.onNext});
 
   @override
   Widget build(BuildContext context) {
@@ -2269,7 +2041,7 @@ class LevelCompleteDialog extends StatelessWidget {
         decoration: BoxDecoration(
             gradient: gradient, borderRadius: BorderRadius.circular(26)),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Text(isPerfect ? '👑' : '', style: const TextStyle(fontSize: 56)),
+          Text(isPerfect ? '👑' : '🎉', style: const TextStyle(fontSize: 56)),
           const SizedBox(height: 8),
           Text(isPerfect ? 'أداء مثالي!' : 'أحسنت!',
               style: const TextStyle(
@@ -2290,18 +2062,16 @@ class LevelCompleteDialog extends StatelessWidget {
               Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
                 _stat('نقاط المرحلة', '$levelScore'),
                 _stat('الإجمالي', '$totalScore'),
-                _stat('الدقة', '${(pct * 100).toStringAsFixed(0)}%'),
+                _stat('الدقة', '${(pct * 100).toStringAsFixed(0)}%')
               ]),
               const SizedBox(height: 10),
               ClipRRect(
-                borderRadius: BorderRadius.circular(6),
-                child: LinearProgressIndicator(
-                  value: pct,
-                  minHeight: 7,
-                  backgroundColor: Colors.white24,
-                  valueColor: const AlwaysStoppedAnimation(Colors.white),
-                ),
-              ),
+                  borderRadius: BorderRadius.circular(6),
+                  child: LinearProgressIndicator(
+                      value: pct,
+                      minHeight: 7,
+                      backgroundColor: Colors.white24,
+                      valueColor: const AlwaysStoppedAnimation(Colors.white))),
             ]),
           ),
           const SizedBox(height: 18),
@@ -2341,10 +2111,9 @@ class LevelCompleteDialog extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 11),
           decoration: BoxDecoration(
-            color: outlined ? Colors.white.withOpacity(0.2) : Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: outlined ? Border.all(color: Colors.white54) : null,
-          ),
+              color: outlined ? Colors.white.withOpacity(0.2) : Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: outlined ? Border.all(color: Colors.white54) : null),
           child: Column(children: [
             Icon(ic,
                 color: outlined ? Colors.white : AppColors.primaryDark,
@@ -2361,11 +2130,10 @@ class LevelCompleteDialog extends StatelessWidget {
 }
 
 // ============================================================
-//  شاشة سياسة الخصوصية
+// 🔒 شاشة سياسة الخصوصية
 // ============================================================
 class PrivacyPolicyScreen extends StatelessWidget {
   const PrivacyPolicyScreen({super.key});
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -2375,97 +2143,54 @@ class PrivacyPolicyScreen extends StatelessWidget {
         padding: const EdgeInsets.all(20),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(22),
-            decoration: BoxDecoration(
-              gradient: AppColors.primaryGradient,
-              borderRadius: BorderRadius.circular(22),
-            ),
-            child: const Column(children: [
-              Text('🔒', style: TextStyle(fontSize: 44)),
-              SizedBox(height: 8),
-              Text('سياسة الخصوصية',
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold)),
-              SizedBox(height: 4),
-              Text('آخر تحديث: يوليو 2026',
-                  style: TextStyle(color: Colors.white70, fontSize: 12)),
-            ]),
-          ),
+              width: double.infinity,
+              padding: const EdgeInsets.all(22),
+              decoration: BoxDecoration(
+                  gradient: AppColors.primaryGradient,
+                  borderRadius: BorderRadius.circular(22)),
+              child: const Column(children: [
+                Text('🔒', style: TextStyle(fontSize: 44)),
+                SizedBox(height: 8),
+                Text('سياسة الخصوصية',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold)),
+                SizedBox(height: 4),
+                Text('آخر تحديث: يوليو 2026',
+                    style: TextStyle(color: Colors.white70, fontSize: 12)),
+              ])),
           const SizedBox(height: 22),
           _section('1. المقدمة',
               'مرحباً بكم في تطبيق "لعبة الأسئلة". نحن ملتزمون بحماية خصوصيتكم. توضح هذه السياسة كيفية جمعنا للمعلومات واستخدامها وحمايتها.'),
-          _section(
-            '2. البيانات التي نحفظها',
-            'التطبيق يحفظ البيانات التالية محلياً على جهازك فقط:\n'
-                '• إجمالي النقاط المكتسبة\n'
-                '• رقم المرحلة الحالية\n'
-                '• قائمة المراحل المفتوحة والمكتملة\n'
-                '• تفضيل الوضع الداكن أو الفاتح\n'
-                'لا نجمع أي بيانات شخصية كالاسم أو البريد الإلكتروني أو الموقع الجغرافي.',
-          ),
-          _section(
-            '3. استخدام البيانات',
-            'البيانات المحفوظة تُستخدم حصرياً لـ:\n'
-                '• حفظ تقدمك في اللعبة وعدم فقده\n'
-                '• عرض النقاط والمراحل المفتوحة\n'
-                '• تذكّر تفضيلات العرض\n'
-                'لا تُشارك هذه البيانات مع أي طرف ثالث إطلاقاً.',
-          ),
-          _section(
-            '4. الإعلانات',
-            'يستخدم التطبيق خدمة إعلانات Google AdMob لعرض إعلانات (بانر وإعلانات بينية) '
-                'داخل التطبيق لدعم استمراريته مجاناً. قد تقوم Google بجمع معرّف الجهاز '
-                'الإعلاني ومعلومات تقنية أخرى وفق سياسة خصوصية Google الخاصة بالإعلانات، '
-                'والتي يمكنك مراجعتها والتحكم بتفضيلاتها عبر إعدادات جهازك.',
-          ),
-          _section(
-            '5. أمان البيانات',
-            'بيانات تقدمك محفوظة على جهازك فقط باستخدام SharedPreferences ولا يُرسَل '
-                'أي شيء منها إلى خوادمنا. يمكنك حذف جميع بياناتك في أي وقت عبر "إعادة ضبط" '
-                'في الشاشة الرئيسية.',
-          ),
-          _section(
-            '6. حقوقك',
-            'لديك الحق الكامل في:\n'
-                '• الاطلاع على بياناتك المحفوظة\n'
-                '• حذفها في أي وقت تشاء\n'
-                '• إيقاف استخدام التطبيق',
-          ),
-          _section(
-            '7. الأطفال',
-            'تطبيقنا مناسب لجميع الأعمار. لا نجمع أي بيانات خاصة بالأطفال '
-                'دون موافقة ولي الأمر، إذ لا نجمع بيانات شخصية أصلاً بخلاف ما توفره خدمة الإعلانات.',
-          ),
-          _section(
-            '8. التعديلات',
-            'قد نحدّث هذه السياسة من وقت لآخر. سيتم إخطارك بأي تغييرات '
-                'جوهرية عند تحديث التطبيق.',
-          ),
-          _section(
-            '9. تواصل معنا',
-            'لأي استفسار حول سياسة الخصوصية:\n'
-                '📧 support@quizgame.app\n'
-                '🌐 www.quizgame.app',
-          ),
+          _section('2. البيانات التي نحفظها',
+              'التطبيق يحفظ البيانات التالية محلياً على جهازك فقط:\n• إجمالي النقاط المكتسبة\n• رقم المرحلة الحالية\n• قائمة المراحل المفتوحة والمكتملة\n• تفضيل الوضع الداكن أو الفاتح\nلا نجمع أي بيانات شخصية كالاسم أو البريد الإلكتروني أو الموقع الجغرافي.'),
+          _section('3. استخدام البيانات',
+              'البيانات المحفوظة تُستخدم حصرياً لـ:\n• حفظ تقدمك في اللعبة وعدم فقده\n• عرض النقاط والمراحل المفتوحة\n• تذكّر تفضيلات العرض\nلا تُشارك هذه البيانات مع أي طرف ثالث إطلاقاً.'),
+          _section('4. الإعلانات',
+              'يستخدم التطبيق خدمة إعلانات Google AdMob لعرض إعلانات (بانر، إعلانات بينية، إعلانات مكافأة، وإعلانات شاشة فتح) داخل التطبيق لدعم استمراريته مجاناً. قد تقوم Google بجمع معرّف الجهاز الإعلاني ومعلومات تقنية أخرى وفق سياسة خصوصية Google الخاصة بالإعلانات.'),
+          _section('5. أمان البيانات',
+              'بيانات تقدمك محفوظة على جهازك فقط باستخدام SharedPreferences ولا يُرسَل أي شيء منها إلى خوادمنا. يمكنك حذف جميع بياناتك في أي وقت عبر "إعادة ضبط" في الشاشة الرئيسية.'),
+          _section('6. حقوقك',
+              'لديك الحق الكامل في:\n• الاطلاع على بياناتك المحفوظة\n• حذفها في أي وقت تشاء\n• إيقاف استخدام التطبيق'),
+          _section('7. الأطفال',
+              'تطبيقنا مناسب لجميع الأعمار. لا نجمع أي بيانات خاصة بالأطفال دون موافقة ولي الأمر.'),
+          _section('8. التعديلات',
+              'قد نحدّث هذه السياسة من وقت لآخر. سيتم إخطارك بأي تغييرات جوهرية عند تحديث التطبيق.'),
+          _section('9. تواصل معنا',
+              'لأي استفسار حول سياسة الخصوصية:\n📧 support@quizgame.app\n🌐 www.quizgame.app'),
           const SizedBox(height: 16),
           Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.primaryDark.withOpacity(0.18),
-              borderRadius: BorderRadius.circular(14),
-              border:
-                  Border.all(color: AppColors.primaryDark.withOpacity(0.50)),
-            ),
-            child: const Text(
-              'باستخدامك للتطبيق فأنت توافق على هذه السياسة. '
-              'إن لم تكن موافقاً يرجى التوقف عن الاستخدام.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 14, height: 1.6),
-            ),
-          ),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                  color: AppColors.primaryDark.withOpacity(0.18),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                      color: AppColors.primaryDark.withOpacity(0.50))),
+              child: const Text(
+                  'باستخدامك للتطبيق فأنت توافق على هذه السياسة. إن لم تكن موافقاً يرجى التوقف عن الاستخدام.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 14, height: 1.6))),
           const SizedBox(height: 30),
         ]),
       ),

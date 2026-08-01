@@ -117,26 +117,27 @@ class GameStorage {
   static Future<void> saveLevelProgress(
       int levelId, int qIdx, int levelScore) async {
     final p = await SharedPreferences.getInstance();
-    await p.setInt(_kProgLevel, levelId);
-    await p.setInt(_kProgQIdx, qIdx);
-    await p.setInt(_kProgScore, levelScore);
+    await p.setInt('$_kProgLevel:$levelId', levelId);
+    await p.setInt('$_kProgQIdx:$levelId', qIdx);
+    await p.setInt('$_kProgScore:$levelId', levelScore);
   }
 
-  static Future<Map<String, int>?> getLevelProgress() async {
+  static Future<Map<String, int>?> getLevelProgress(int levelId) async {
     final p = await SharedPreferences.getInstance();
-    if (!p.containsKey(_kProgLevel)) return null;
+    final hasProgress = p.containsKey('$_kProgLevel:$levelId');
+    if (!hasProgress) return null;
     return {
-      'levelId': p.getInt(_kProgLevel) ?? -1,
-      'qIdx': p.getInt(_kProgQIdx) ?? 0,
-      'levelScore': p.getInt(_kProgScore) ?? 0,
+      'levelId': p.getInt('$_kProgLevel:$levelId') ?? -1,
+      'qIdx': p.getInt('$_kProgQIdx:$levelId') ?? 0,
+      'levelScore': p.getInt('$_kProgScore:$levelId') ?? 0,
     };
   }
 
-  static Future<void> clearLevelProgress() async {
+  static Future<void> clearLevelProgress(int levelId) async {
     final p = await SharedPreferences.getInstance();
-    await p.remove(_kProgLevel);
-    await p.remove(_kProgQIdx);
-    await p.remove(_kProgScore);
+    await p.remove('$_kProgLevel:$levelId');
+    await p.remove('$_kProgQIdx:$levelId');
+    await p.remove('$_kProgScore:$levelId');
   }
 
   static Future<void> saveLevelAnsweredCount(int levelId, int count) async {
@@ -227,8 +228,15 @@ class GameState extends ChangeNotifier {
   }
 
   void _syncUnlockedLevels() {
+    if (!_unlockedLevels.contains(1)) {
+      _unlockedLevels.add(1);
+    }
+
     for (int i = 2; i <= QuizData.levels.length; i++) {
-      if (_completedLevels.contains(i - 1) && !_unlockedLevels.contains(i)) {
+      final shouldUnlockByScore = _totalScore >= (i - 1) * 120;
+      final shouldUnlockByPrevious = _completedLevels.contains(i - 1);
+      if ((shouldUnlockByScore || shouldUnlockByPrevious) &&
+          !_unlockedLevels.contains(i)) {
         _unlockedLevels.add(i);
       }
     }
@@ -248,6 +256,13 @@ class GameState extends ChangeNotifier {
   void addScore(int pts) {
     _totalScore += pts;
     GameStorage.saveScore(_totalScore);
+    _syncUnlockedLevels();
+    notifyListeners();
+  }
+
+  void completeQuestion() {
+    _coins += 2;
+    GameStorage.saveCoins(_coins);
     notifyListeners();
   }
 
@@ -279,6 +294,7 @@ class GameState extends ChangeNotifier {
       _completedLevels.add(levelId);
       GameStorage.saveCompletedLevels(_completedLevels);
     }
+    _syncUnlockedLevels();
     final lvl = QuizData.levels.firstWhere((l) => l.id == levelId,
         orElse: () => QuizData.levels.first);
     recordAnsweredProgress(levelId, lvl.questions.length);
@@ -1420,6 +1436,31 @@ class ProgressScreen extends StatelessWidget {
       ]);
 }
 
+class QuizProgressTracker {
+  final Set<int> wrongAnswers = <int>{};
+  final Set<int> passedQuestions = <int>{};
+
+  void recordAnswer(int questionIndex, bool isCorrect) {
+    if (isCorrect) {
+      passedQuestions.add(questionIndex);
+      wrongAnswers.remove(questionIndex);
+    } else {
+      wrongAnswers.add(questionIndex);
+    }
+  }
+
+  bool isWrong(int questionIndex) =>
+      wrongAnswers.contains(questionIndex) &&
+      !passedQuestions.contains(questionIndex);
+
+  bool isPassed(int questionIndex) => passedQuestions.contains(questionIndex);
+
+  void reset() {
+    wrongAnswers.clear();
+    passedQuestions.clear();
+  }
+}
+
 // ============================================================
 // ❓ شاشة الأسئلة
 // ============================================================
@@ -1438,7 +1479,11 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   bool _answered = false;
   bool _isDisposed = false;
   Set<int> _eliminated = {};
+  final QuizProgressTracker _progressTracker = QuizProgressTracker();
   bool _watchingAd = false;
+  int _interstitialTriggerCount = 0;
+  BannerAd? _bannerAd;
+  bool _bannerReady = false;
 
   late final AnimationController _qCtrl = AnimationController(
       vsync: this, duration: const Duration(milliseconds: 450));
@@ -1458,15 +1503,24 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+    _loadBanner();
     _restoreProgressThenStart();
   }
 
+  void _loadBanner() {
+    _bannerAd = AdManager.instance.createBannerAd(
+      onLoaded: () {
+        if (mounted) setState(() => _bannerReady = true);
+      },
+    );
+  }
+
   Future<void> _restoreProgressThenStart() async {
-    final prog = await GameStorage.getLevelProgress();
+    final prog = await GameStorage.getLevelProgress(widget.level.id);
     if (prog != null && prog['levelId'] == widget.level.id && !_isDisposed) {
       final savedIdx = prog['qIdx'] ?? 0;
       final savedScore = prog['levelScore'] ?? 0;
-      if (savedIdx > 0 && savedIdx < _total) {
+      if (savedIdx >= 0 && savedIdx < _total) {
         setState(() {
           _qIdx = savedIdx;
           _levelScore = savedScore;
@@ -1474,6 +1528,14 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
       }
     }
     if (!mounted) return;
+    if (widget.gameState.isLevelCompleted(widget.level.id) &&
+        (_qIdx >= _total - 1 || _qIdx == 0 && _levelScore >= _total * 10)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _openCompleteDialog();
+      });
+      return;
+    }
     _startQuestion();
   }
 
@@ -1498,6 +1560,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
     _qCtrl.dispose();
     _resCtrl.dispose();
     _timerCtrl.dispose();
+    _bannerAd?.dispose();
     super.dispose();
   }
 
@@ -1510,22 +1573,39 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
     setState(() {
       _selected = idx;
       _answered = true;
+      _progressTracker.recordAnswer(_qIdx, idx == _q.correctIndex);
     });
     _resCtrl.forward(from: 0);
     if (idx == _q.correctIndex) {
       widget.gameState.addScore(10);
       _levelScore += 10;
     }
+    widget.gameState.completeQuestion();
     widget.gameState.recordAnsweredProgress(widget.level.id, _qIdx + 1);
     _persistProgress();
     Future.delayed(const Duration(milliseconds: 1900), () {
       if (!mounted) return;
       if (_qIdx < _total - 1) {
-        _nextQuestion();
+        _handleQuestionTransition();
       } else {
         _showComplete();
       }
     });
+  }
+
+  void _handleQuestionTransition() {
+    _interstitialTriggerCount += 1;
+    final shouldShow = AdManager.shouldShowInterstitialForQuestionIndex(
+      _interstitialTriggerCount,
+    );
+    if (shouldShow) {
+      AdManager.instance.showInterstitial(onDismissed: () {
+        if (!mounted) return;
+        _nextQuestion();
+      });
+      return;
+    }
+    _nextQuestion();
   }
 
   void _use5050() {
@@ -1587,8 +1667,8 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   }
 
   void _showComplete() {
-    GameStorage.clearLevelProgress();
     widget.gameState.markLevelCompleted(widget.level.id);
+    GameStorage.saveLevelProgress(widget.level.id, _total - 1, _levelScore);
     AdManager.instance.showInterstitial(onDismissed: () {
       if (!mounted) return;
       _openCompleteDialog();
@@ -1615,6 +1695,18 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
     );
   }
 
+  void _retryCurrentQuestion() {
+    _qCtrl.reset();
+    _resCtrl.reset();
+    _timerCtrl.reset();
+    setState(() {
+      _selected = null;
+      _answered = false;
+      _eliminated = {};
+    });
+    _startQuestion();
+  }
+
   void _restart() {
     GameStorage.saveLevelProgress(widget.level.id, 0, 0);
     setState(() {
@@ -1623,6 +1715,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
       _selected = null;
       _answered = false;
       _eliminated = {};
+      _progressTracker.reset();
       _startQuestion();
     });
   }
@@ -1673,11 +1766,67 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                     child: FadeTransition(
                         opacity: _qFade, child: _buildQuestionCard()))),
             const SizedBox(height: 12),
+            _buildQuestionProgressDots(),
+            const SizedBox(height: 10),
             _buildHintsRow(),
             const SizedBox(height: 10),
             ..._buildOptions(),
+            const SizedBox(height: 8),
+            if (_bannerReady && _bannerAd != null) ...[
+              Container(
+                alignment: Alignment.center,
+                width: _bannerAd!.size.width.toDouble(),
+                height: _bannerAd!.size.height.toDouble(),
+                child: AdWidget(ad: _bannerAd!),
+              ),
+            ],
           ]),
         ),
+      ),
+    );
+  }
+
+  Widget _buildQuestionProgressDots() {
+    return SizedBox(
+      height: 28,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: _total,
+        separatorBuilder: (_, __) => const SizedBox(width: 6),
+        itemBuilder: (context, index) {
+          final isCurrent = index == _qIdx;
+          final isPassed = index < _qIdx || _progressTracker.isPassed(index);
+          final isCompleted =
+              widget.gameState.isLevelCompleted(widget.level.id) &&
+                  index == _total - 1;
+          final isWrong = _progressTracker.isWrong(index);
+          return Container(
+            width: 24,
+            height: 24,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: isWrong
+                  ? AppColors.wrongColor
+                  : isCompleted || isPassed
+                      ? AppColors.correctColor
+                      : isCurrent
+                          ? widget.level.color
+                          : Colors.grey.withOpacity(0.2),
+            ),
+            child: Center(
+              child: Text(
+                '${index + 1}',
+                style: TextStyle(
+                  color: isWrong || isCompleted || isPassed || isCurrent
+                      ? Colors.white
+                      : _sub,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -1905,6 +2054,25 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                   Text(_q.explanation,
                       textAlign: TextAlign.center,
                       style: TextStyle(color: _sub, fontSize: 12, height: 1.4)),
+                  if (_answered && _selected != _q.correctIndex) ...[
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: _retryCurrentQuestion,
+                        icon: const Icon(Icons.refresh_rounded, size: 18),
+                        label: const Text('إعادة حل السؤال'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primaryDark,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                      ),
+                    ),
+                  ],
                 ]),
               ),
             ),

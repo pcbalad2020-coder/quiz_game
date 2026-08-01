@@ -8,6 +8,10 @@ class AdManager {
   AdManager._();
   static final AdManager instance = AdManager._();
 
+  static bool shouldShowInterstitialForQuestionIndex(int questionIndex) {
+    return questionIndex > 0 && (questionIndex + 1) % 5 == 0;
+  }
+
   // معرفات الإعلانات الحقيقية (Production IDs)
   static const String bannerAdUnitId = 'ca-app-pub-4756404048214956/4530955680';
   static const String interstitialAdUnitId =

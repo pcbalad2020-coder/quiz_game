@@ -1753,34 +1753,49 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
     return Scaffold(
       backgroundColor: _bg,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-          child: Column(children: [
-            _buildHeader(),
-            const SizedBox(height: 10),
-            _buildProgressAndTimer(),
-            const SizedBox(height: 16),
-            Expanded(
-                child: SlideTransition(
-                    position: _qSlide,
-                    child: FadeTransition(
-                        opacity: _qFade, child: _buildQuestionCard()))),
-            const SizedBox(height: 12),
-            _buildQuestionProgressDots(),
-            const SizedBox(height: 10),
-            _buildHintsRow(),
-            const SizedBox(height: 10),
-            ..._buildOptions(),
-            const SizedBox(height: 8),
-            if (_bannerReady && _bannerAd != null) ...[
-              Container(
-                alignment: Alignment.center,
-                width: _bannerAd!.size.width.toDouble(),
-                height: _bannerAd!.size.height.toDouble(),
-                child: AdWidget(ad: _bannerAd!),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+                  child: Column(children: [
+                    _buildHeader(),
+                    const SizedBox(height: 10),
+                    _buildProgressAndTimer(),
+                    const SizedBox(height: 16),
+                    Container(
+                      constraints: const BoxConstraints(minHeight: 190),
+                      child: SlideTransition(
+                        position: _qSlide,
+                        child: FadeTransition(
+                          opacity: _qFade,
+                          child: _buildQuestionCard(),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildQuestionProgressDots(),
+                    const SizedBox(height: 10),
+                    _buildHintsRow(),
+                    const SizedBox(height: 10),
+                    ..._buildOptions(),
+                    const SizedBox(height: 8),
+                    if (_bannerReady && _bannerAd != null) ...[
+                      Container(
+                        alignment: Alignment.center,
+                        width: _bannerAd!.size.width.toDouble(),
+                        height: _bannerAd!.size.height.toDouble(),
+                        child: AdWidget(ad: _bannerAd!),
+                      ),
+                    ],
+                  ]),
+                ),
               ),
-            ],
-          ]),
+            );
+          },
         ),
       ),
     );

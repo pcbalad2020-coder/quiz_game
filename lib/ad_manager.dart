@@ -13,14 +13,50 @@ class AdManager {
   }
 
   // معرفات الإعلانات الحقيقية (Production IDs)
-  static const String bannerAdUnitId = 'ca-app-pub-4756404048214956/4530955680';
-  static const String interstitialAdUnitId =
+  static const String _productionBannerAdUnitId =
+      'ca-app-pub-4756404048214956/4530955680';
+  static const String _productionInterstitialAdUnitId =
       'ca-app-pub-4756404048214956/8891324367';
-  static const String rewardedAdUnitId =
+  static const String _productionRewardedAdUnitId =
       'ca-app-pub-4756404048214956/1920535991';
-  static const String appOpenAdUnitId =
+  static const String _productionAppOpenAdUnitId =
       'ca-app-pub-4756404048214956/5631871670';
-  static const String nativeAdUnitId = 'ca-app-pub-4756404048214956/3953772582';
+  static const String _productionNativeAdUnitId =
+      'ca-app-pub-4756404048214956/3953772582';
+
+  static const String _testBannerAdUnitId =
+      'ca-app-pub-3940256099942544/6300978111';
+  static const String _testInterstitialAdUnitId =
+      'ca-app-pub-3940256099942544/1033173712';
+  static const String _testRewardedAdUnitId =
+      'ca-app-pub-3940256099942544/5224354917';
+  static const String _testAppOpenAdUnitId =
+      'ca-app-pub-3940256099942544/3419835294';
+  static const String _testNativeAdUnitId =
+      'ca-app-pub-3940256099942544/2247696110';
+
+  static String bannerAdUnitIdForPlatform({required bool isIOS}) =>
+      isIOS ? _testBannerAdUnitId : _productionBannerAdUnitId;
+
+  static String interstitialAdUnitIdForPlatform({required bool isIOS}) =>
+      isIOS ? _testInterstitialAdUnitId : _productionInterstitialAdUnitId;
+
+  static String rewardedAdUnitIdForPlatform({required bool isIOS}) =>
+      isIOS ? _testRewardedAdUnitId : _productionRewardedAdUnitId;
+
+  static String appOpenAdUnitIdForPlatform({required bool isIOS}) =>
+      isIOS ? _testAppOpenAdUnitId : _productionAppOpenAdUnitId;
+
+  static String nativeAdUnitIdForPlatform({required bool isIOS}) =>
+      isIOS ? _testNativeAdUnitId : _productionNativeAdUnitId;
+
+  static String get bannerAdUnitId => bannerAdUnitIdForPlatform(isIOS: true);
+  static String get interstitialAdUnitId =>
+      interstitialAdUnitIdForPlatform(isIOS: true);
+  static String get rewardedAdUnitId =>
+      rewardedAdUnitIdForPlatform(isIOS: true);
+  static String get appOpenAdUnitId => appOpenAdUnitIdForPlatform(isIOS: true);
+  static String get nativeAdUnitId => nativeAdUnitIdForPlatform(isIOS: true);
 
   // ----------------------------------------------------------
   // 1️⃣ الإعلان البيني (Interstitial)

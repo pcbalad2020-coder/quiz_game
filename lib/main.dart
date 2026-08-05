@@ -405,15 +405,30 @@ class QuizApp extends StatefulWidget {
 
 class _QuizAppState extends State<QuizApp> {
   final GameState _gs = GameState();
+  late Locale _locale = Locale(_gs.languageCode);
+
   @override
   void initState() {
     super.initState();
+    _gs.addListener(_syncLocale);
     _gs.loadData();
+  }
+
+  void _syncLocale() {
+    setState(() {
+      _locale = Locale(_gs.languageCode);
+    });
+  }
+
+  @override
+  void dispose() {
+    _gs.removeListener(_syncLocale);
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final locale = Locale(_gs.languageCode);
+    final locale = _locale;
     return AnimatedBuilder(
       animation: _gs,
       builder: (_, __) => MaterialApp(

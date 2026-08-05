@@ -26,7 +26,8 @@ class AppLocalizations {
 
   static String tr(BuildContext context,
       {required String ar, required String en}) {
-    return AppLocalizations.of(context).languageCode == 'ar' ? ar : en;
+    final locale = Localizations.localeOf(context);
+    return locale.languageCode == 'ar' ? ar : en;
   }
 }
 
@@ -831,7 +832,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 decoration: BoxDecoration(
                     color: _card, borderRadius: BorderRadius.circular(12)),
                 child: Text(
-                  widget.gameState.languageCode == 'ar' ? 'EN' : 'ع',
+                  widget.gameState.languageCode == 'ar' ? 'EN' : 'عربي',
                   style: TextStyle(
                       color: AppColors.primaryDark,
                       fontWeight: FontWeight.bold,

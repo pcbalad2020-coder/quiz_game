@@ -1,11 +1,50 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 // استيراد ملفاتك الأخرى
 import 'quiz_data.dart';
 import 'ad_manager.dart'; // ✅ استيراد ملف الإعلانات المنفصل
+
+class AppLocalizations {
+  final Locale locale;
+  AppLocalizations(this.locale);
+
+  static const supportedLocales = [Locale('ar'), Locale('en')];
+  static const LocalizationsDelegate<AppLocalizations> delegate =
+      _AppLocalizationsDelegate();
+
+  static AppLocalizations of(BuildContext context) {
+    final localizations =
+        Localizations.of<AppLocalizations>(context, AppLocalizations);
+    return localizations ?? AppLocalizations(const Locale('ar'));
+  }
+
+  String get languageCode => locale.languageCode;
+
+  static String tr(BuildContext context,
+      {required String ar, required String en}) {
+    return AppLocalizations.of(context).languageCode == 'ar' ? ar : en;
+  }
+}
+
+class _AppLocalizationsDelegate
+    extends LocalizationsDelegate<AppLocalizations> {
+  const _AppLocalizationsDelegate();
+
+  @override
+  bool isSupported(Locale locale) => ['ar', 'en'].contains(locale.languageCode);
+
+  @override
+  Future<AppLocalizations> load(Locale locale) async {
+    return AppLocalizations(locale);
+  }
+
+  @override
+  bool shouldReload(_AppLocalizationsDelegate old) => false;
+}
 
 // ============================================================
 // 🚀 نقطة الدخول الرئيسية
@@ -93,6 +132,12 @@ class GameStorage {
       (await SharedPreferences.getInstance()).setBool(_kDarkMode, v);
   static Future<bool> getDarkMode() async =>
       (await SharedPreferences.getInstance()).getBool(_kDarkMode) ?? true;
+
+  static const String _kLanguage = 'language_code';
+  static Future<void> saveLanguageCode(String code) async =>
+      (await SharedPreferences.getInstance()).setString(_kLanguage, code);
+  static Future<String> getLanguageCode() async =>
+      (await SharedPreferences.getInstance()).getString(_kLanguage) ?? 'ar';
 
   static Future<void> saveUnlockedLevels(List<int> levels) async {
     final p = await SharedPreferences.getInstance();
@@ -192,10 +237,12 @@ class GameState extends ChangeNotifier {
   List<int> _completedLevels = [];
   bool _isDarkMode = true;
   bool _isLoading = true;
+  String _languageCode = 'ar';
   Map<int, int> _levelAnsweredCounts = {};
   int _coins = 20;
 
   int get totalScore => _totalScore;
+  String get languageCode => _languageCode;
   int get currentLevel => _currentLevel;
   List<int> get unlockedLevels => _unlockedLevels;
   List<int> get completedLevels => _completedLevels;
@@ -217,6 +264,7 @@ class GameState extends ChangeNotifier {
     _unlockedLevels = await GameStorage.getUnlockedLevels();
     _completedLevels = await GameStorage.getCompletedLevels();
     _isDarkMode = await GameStorage.getDarkMode();
+    _languageCode = await GameStorage.getLanguageCode();
     _levelAnsweredCounts = await GameStorage.getLevelAnsweredMap();
     _coins = await GameStorage.getCoins();
     if (!_unlockedLevels.contains(1)) _unlockedLevels.add(1);
@@ -323,6 +371,12 @@ class GameState extends ChangeNotifier {
     notifyListeners();
   }
 
+  void toggleLanguage() {
+    _languageCode = _languageCode == 'ar' ? 'en' : 'ar';
+    GameStorage.saveLanguageCode(_languageCode);
+    notifyListeners();
+  }
+
   int answeredCountForLevel(int levelId) => _levelAnsweredCounts[levelId] ?? 0;
   bool isLevelUnlocked(int id) => _unlockedLevels.contains(id);
   bool isLevelCompleted(int id) => _completedLevels.contains(id);
@@ -358,18 +412,33 @@ class _QuizAppState extends State<QuizApp> {
 
   @override
   Widget build(BuildContext context) {
+    final locale = Locale(_gs.languageCode);
     return AnimatedBuilder(
       animation: _gs,
-      builder: (_, __) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: MaterialApp(
-          title: 'لعبة الأسئلة',
-          debugShowCheckedModeBanner: false,
-          themeMode: _gs.isDarkMode ? ThemeMode.dark : ThemeMode.light,
-          theme: _lightTheme(),
-          darkTheme: _darkTheme(),
-          home: SplashScreen(gameState: _gs),
-        ),
+      builder: (_, __) => MaterialApp(
+        locale: locale,
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        localeResolutionCallback: (locale, supported) {
+          if (locale == null) return supported.first;
+          for (var supportedLocale in supported) {
+            if (supportedLocale.languageCode == locale.languageCode) {
+              return supportedLocale;
+            }
+          }
+          return supported.first;
+        },
+        title: _gs.languageCode == 'ar' ? 'لعبة الأسئلة' : 'Quiz Game',
+        debugShowCheckedModeBanner: false,
+        themeMode: _gs.isDarkMode ? ThemeMode.dark : ThemeMode.light,
+        theme: _lightTheme(),
+        darkTheme: _darkTheme(),
+        home: SplashScreen(gameState: _gs),
       ),
     );
   }
@@ -516,7 +585,9 @@ class _SplashScreenState extends State<SplashScreen>
               FadeTransition(
                 opacity: _fadeAnim,
                 child: Column(children: [
-                  const Text('لعبة الأسئلة',
+                  Text(
+                      AppLocalizations.tr(context,
+                          ar: 'لعبة الأسئلة', en: 'Quiz Game'),
                       textAlign: TextAlign.center,
                       style: TextStyle(
                           color: Colors.white,
@@ -524,13 +595,22 @@ class _SplashScreenState extends State<SplashScreen>
                           fontWeight: FontWeight.bold,
                           letterSpacing: 1.5)),
                   const SizedBox(height: 6),
-                  Text('اختبر معلوماتك في ${QuizData.levels.length} مراحل',
+                  Text(
+                      AppLocalizations.tr(context,
+                          ar:
+                              'اختبر معلوماتك في ${QuizData.levels.length} مراحل',
+                          en:
+                              'Test your knowledge in ${QuizData.levels.length} levels'),
                       textAlign: TextAlign.center,
                       style: TextStyle(
                           color: Colors.white.withOpacity(0.8), fontSize: 15)),
                   const SizedBox(height: 6),
                   Text(
-                      '${QuizData.levels.fold(0, (s, l) => s + l.questions.length)} سؤالاً متنوعاً',
+                      AppLocalizations.tr(context,
+                          ar:
+                              '${QuizData.levels.fold(0, (s, l) => s + l.questions.length)} سؤالاً متنوعاً',
+                          en:
+                              '${QuizData.levels.fold(0, (s, l) => s + l.questions.length)} diverse questions'),
                       textAlign: TextAlign.center,
                       style: TextStyle(
                           color: Colors.white.withOpacity(0.65), fontSize: 13)),
@@ -553,7 +633,9 @@ class _SplashScreenState extends State<SplashScreen>
                 ),
               ),
               const SizedBox(height: 10),
-              const Text('جارٍ التحميل...',
+              Text(
+                  AppLocalizations.tr(context,
+                      ar: 'جارٍ التحميل...', en: 'Loading...'),
                   textAlign: TextAlign.center,
                   style: TextStyle(color: Colors.white70, fontSize: 12)),
               const SizedBox(height: 32),
@@ -648,16 +730,23 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   child: Column(children: [
                     _actionBtn(
                         icon: Icons.play_arrow_rounded,
-                        title: 'ابدأ اللعبة',
-                        subtitle: 'اختر المرحلة التي تريد اللعب منها',
+                        title: AppLocalizations.tr(context,
+                            ar: 'ابدأ اللعبة', en: 'Start Game'),
+                        subtitle: AppLocalizations.tr(context,
+                            ar: 'اختر المرحلة التي تريد اللعب منها',
+                            en: 'Choose the level to play'),
                         gradient: AppColors.primaryGradient,
                         onTap: _startGame),
                     const SizedBox(height: 14),
                     _actionBtn(
                         icon: Icons.grid_view_rounded,
-                        title: 'اختيار المرحلة',
-                        subtitle:
-                            '${widget.gameState.unlockedLevels.length} مراحل مفتوحة من ${QuizData.levels.length}',
+                        title: AppLocalizations.tr(context,
+                            ar: 'اختيار المرحلة', en: 'Select Level'),
+                        subtitle: AppLocalizations.tr(context,
+                            ar:
+                                '${widget.gameState.unlockedLevels.length} مراحل مفتوحة من ${QuizData.levels.length}',
+                            en:
+                                '${widget.gameState.unlockedLevels.length} open levels of ${QuizData.levels.length}'),
                         gradient: LinearGradient(colors: [
                           AppColors.secondaryDark,
                           AppColors.secondaryDark.withOpacity(0.7)
@@ -666,16 +755,22 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     const SizedBox(height: 14),
                     _actionBtn(
                         icon: Icons.leaderboard_rounded,
-                        title: 'لوحة التقدم',
-                        subtitle: 'شاهد تقدمك في المراحل',
+                        title: AppLocalizations.tr(context,
+                            ar: 'لوحة التقدم', en: 'Progress Board'),
+                        subtitle: AppLocalizations.tr(context,
+                            ar: 'شاهد تقدمك في المراحل',
+                            en: 'See your progress through levels'),
                         gradient: const LinearGradient(
                             colors: [Color(0xFFFF6D00), Color(0xFFFF9800)]),
                         onTap: _openProgress),
                     const SizedBox(height: 14),
                     _actionBtn(
                         icon: Icons.privacy_tip_rounded,
-                        title: 'سياسة الخصوصية',
-                        subtitle: 'اقرأ سياسة حماية بياناتك',
+                        title: AppLocalizations.tr(context,
+                            ar: 'سياسة الخصوصية', en: 'Privacy Policy'),
+                        subtitle: AppLocalizations.tr(context,
+                            ar: 'اقرأ سياسة حماية بياناتك',
+                            en: 'Read how your data is protected'),
                         gradient: LinearGradient(colors: [
                           Colors.grey.shade700,
                           Colors.grey.shade900
@@ -684,12 +779,20 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     const SizedBox(height: 18),
                     Row(children: [
                       Expanded(
-                          child: _smallBtn(Icons.refresh_rounded, 'إعادة ضبط',
-                              AppColors.wrongColor, _confirmReset)),
+                          child: _smallBtn(
+                              Icons.refresh_rounded,
+                              AppLocalizations.tr(context,
+                                  ar: 'إعادة ضبط', en: 'Reset'),
+                              AppColors.wrongColor,
+                              _confirmReset)),
                       const SizedBox(width: 10),
                       Expanded(
-                          child: _smallBtn(Icons.info_outline_rounded,
-                              'عن اللعبة', AppColors.primaryDark, _showAbout)),
+                          child: _smallBtn(
+                              Icons.info_outline_rounded,
+                              AppLocalizations.tr(context,
+                                  ar: 'عن اللعبة', en: 'About'),
+                              AppColors.primaryDark,
+                              _showAbout)),
                     ]),
                   ]),
                 ),
@@ -715,21 +818,43 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Widget _buildTopBar() => Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text('🧠 لعبة الأسئلة',
+          Text(
+              AppLocalizations.tr(context,
+                  ar: '🧠 لعبة الأسئلة', en: '🧠 Quiz Game'),
               style: TextStyle(
                   color: _txt, fontSize: 20, fontWeight: FontWeight.bold)),
-          GestureDetector(
-            onTap: widget.gameState.toggleDarkMode,
-            child: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                  color: _card, borderRadius: BorderRadius.circular(12)),
-              child: Icon(
-                  _isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
-                  color: AppColors.primaryDark,
-                  size: 20),
+          Row(children: [
+            GestureDetector(
+              onTap: widget.gameState.toggleLanguage,
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                    color: _card, borderRadius: BorderRadius.circular(12)),
+                child: Text(
+                  widget.gameState.languageCode == 'ar' ? 'EN' : 'ع',
+                  style: TextStyle(
+                      color: AppColors.primaryDark,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12),
+                ),
+              ),
             ),
-          ),
+            const SizedBox(width: 10),
+            GestureDetector(
+              onTap: widget.gameState.toggleDarkMode,
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                    color: _card, borderRadius: BorderRadius.circular(12)),
+                child: Icon(
+                    _isDark
+                        ? Icons.light_mode_rounded
+                        : Icons.dark_mode_rounded,
+                    color: AppColors.primaryDark,
+                    size: 20),
+              ),
+            ),
+          ]),
         ],
       );
 
@@ -749,7 +874,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           Row(mainAxisAlignment: MainAxisAlignment.center, children: [
             const Text('🏆', style: TextStyle(fontSize: 26)),
             const SizedBox(width: 8),
-            Text('إجمالي نقاطك',
+            Text(
+                AppLocalizations.tr(context,
+                    ar: 'إجمالي نقاطك', en: 'Total Score'),
                 style: TextStyle(
                     color: Colors.white.withOpacity(0.9), fontSize: 15)),
           ]),
@@ -769,7 +896,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             child: Row(mainAxisSize: MainAxisSize.min, children: [
               const Text('🪙', style: TextStyle(fontSize: 14)),
               const SizedBox(width: 5),
-              Text('${widget.gameState.coins} عملة',
+              Text(
+                  AppLocalizations.tr(context,
+                      ar: '${widget.gameState.coins} عملة',
+                      en: '${widget.gameState.coins} coins'),
                   style: const TextStyle(
                       color: Colors.white,
                       fontSize: 12,
@@ -779,10 +909,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           Divider(color: Colors.white.withOpacity(0.25), height: 24),
           Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
             _scoreStat(
-                '📊', 'المرحلة الحالية', '${widget.gameState.currentLevel}'),
-            _scoreStat('🔓', 'مراحل مفتوحة',
+                '📊',
+                AppLocalizations.tr(context,
+                    ar: 'المرحلة الحالية', en: 'Current level'),
+                '${widget.gameState.currentLevel}'),
+            _scoreStat(
+                '🔓',
+                AppLocalizations.tr(context,
+                    ar: 'مراحل مفتوحة', en: 'Unlocked levels'),
                 '${widget.gameState.unlockedLevels.length}/${QuizData.levels.length}'),
-            _scoreStat('✅', 'مراحل مكتملة',
+            _scoreStat(
+                '✅',
+                AppLocalizations.tr(context,
+                    ar: 'مراحل مكتملة', en: 'Completed levels'),
                 '${widget.gameState.completedLevels.length}/${QuizData.levels.length}'),
           ]),
         ]),
@@ -811,10 +950,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           BoxDecoration(color: _card, borderRadius: BorderRadius.circular(18)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Text('التقدم الكلي',
+          Text(
+              AppLocalizations.tr(context,
+                  ar: 'التقدم الكلي', en: 'Overall progress'),
               style: TextStyle(
                   color: _txt, fontWeight: FontWeight.w600, fontSize: 13)),
-          Text('$answered / $total سؤال',
+          Text(
+              AppLocalizations.tr(context,
+                  ar: '$answered / $total سؤال',
+                  en: '$answered / $total questions'),
               style: TextStyle(
                   color: AppColors.primaryDark,
                   fontSize: 12,
@@ -831,7 +975,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ),
         ),
         const SizedBox(height: 6),
-        Text('${(pct * 100).toStringAsFixed(0)}% مكتمل',
+        Text(
+            AppLocalizations.tr(context,
+                ar: '${(pct * 100).toStringAsFixed(0)}% مكتمل',
+                en: '${(pct * 100).toStringAsFixed(0)}% completed'),
             style: TextStyle(color: _sub, fontSize: 11)),
       ]),
     );
@@ -927,13 +1074,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   void _confirmReset() => showDialog(
         context: context,
         builder: (_) => AlertDialog(
-          title: const Text('إعادة ضبط اللعبة ⚠️'),
-          content:
-              const Text('سيتم حذف جميع نقاطك ومراحلك المفتوحة. هل أنت متأكد؟'),
+          title: Text(AppLocalizations.tr(context,
+              ar: 'إعادة ضبط اللعبة ⚠️', en: 'Reset Game ⚠️')),
+          content: Text(AppLocalizations.tr(context,
+              ar: 'سيتم حذف جميع نقاطك ومراحلك المفتوحة. هل أنت متأكد؟',
+              en: 'Your score and unlocked levels will be deleted. Are you sure?')),
           actions: [
             TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('إلغاء')),
+                child: Text(
+                    AppLocalizations.tr(context, ar: 'إلغاء', en: 'Cancel'))),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.wrongColor),
@@ -941,8 +1091,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 widget.gameState.resetGame();
                 Navigator.pop(context);
               },
-              child: const Text('نعم، إعادة ضبط',
-                  style: TextStyle(color: Colors.white)),
+              child: Text(
+                  AppLocalizations.tr(context,
+                      ar: 'نعم، إعادة ضبط', en: 'Yes, reset'),
+                  style: const TextStyle(color: Colors.white)),
             ),
           ],
         ),
@@ -956,12 +1108,21 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           content: Column(mainAxisSize: MainAxisSize.min, children: [
             const Text('🧠', style: TextStyle(fontSize: 52)),
             const SizedBox(height: 10),
-            const Text('لعبة الأسئلة',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            Text(
+                AppLocalizations.tr(context,
+                    ar: 'لعبة الأسئلة', en: 'Quiz Game'),
+                style:
+                    const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 6),
-            const Text('الإصدار 1.1.0', style: TextStyle(fontSize: 13)),
-            const Text('طور بواسطة قاسم البلداوي',
-                style: TextStyle(fontSize: 13)),
+            Text(
+                AppLocalizations.tr(context,
+                    ar: 'الإصدار 1.1.0', en: 'Version 1.1.0'),
+                style: const TextStyle(fontSize: 13)),
+            Text(
+                AppLocalizations.tr(context,
+                    ar: 'طور بواسطة قاسم البلداوي',
+                    en: 'Developed by Qasim Al-Baldawi'),
+                style: const TextStyle(fontSize: 13)),
             const SizedBox(height: 10),
             Container(
               padding: const EdgeInsets.all(12),
@@ -969,7 +1130,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   color: AppColors.primaryDark.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12)),
               child: Text(
-                  '${QuizData.levels.length} مراحل • ${QuizData.levels.fold(0, (s, l) => s + l.questions.length)} سؤالاً متنوعاً\nعلوم • جغرافيا • تاريخ • تقنية\nرياضة • طبيعة • فضاء • فن • طب • دين • ألغاز • أعلام',
+                  AppLocalizations.tr(context,
+                      ar: '${QuizData.levels.length} مراحل • ${QuizData.levels.fold(0, (s, l) => s + l.questions.length)} سؤالاً متنوعاً\nعلوم • جغرافيا • تاريخ • تقنية\nرياضة • طبيعة • فضاء • فن • طب • دين • ألغاز • أعلام',
+                      en: '${QuizData.levels.length} levels • ${QuizData.levels.fold(0, (s, l) => s + l.questions.length)} diverse questions\nScience • Geography • History • Tech\nSports • Nature • Space • Art • Health • Religion • Puzzles • Flags'),
                   textAlign: TextAlign.center,
                   style: const TextStyle(fontSize: 12, height: 1.6)),
             ),
@@ -977,7 +1140,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           actions: [
             ElevatedButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('حسناً'))
+                child:
+                    Text(AppLocalizations.tr(context, ar: 'حسناً', en: 'OK')))
           ],
         ),
       );
@@ -996,7 +1160,10 @@ class LevelSelectorScreen extends StatelessWidget {
     final bg = isDark ? AppColors.backgroundDark : AppColors.backgroundLight;
     return Scaffold(
       backgroundColor: bg,
-      appBar: _appBar('اختر مرحلتك', isDark),
+      appBar: _appBar(
+          AppLocalizations.tr(context,
+              ar: 'اختر مرحلتك', en: 'Choose your level'),
+          isDark),
       body: AnimatedBuilder(
         animation: gameState,
         builder: (_, __) {
@@ -1042,7 +1209,10 @@ class LevelSelectorScreen extends StatelessWidget {
                           child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                            Text('وصلت إلى المرحلة ${resumeLevel.id}',
+                            Text(
+                                AppLocalizations.tr(context,
+                                    ar: 'وصلت إلى المرحلة ${resumeLevel.id}',
+                                    en: 'You reached level ${resumeLevel.id}'),
                                 style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 13,
@@ -1069,7 +1239,9 @@ class LevelSelectorScreen extends StatelessWidget {
                           decoration: BoxDecoration(
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(12)),
-                          child: Text('تابع',
+                          child: Text(
+                              AppLocalizations.tr(context,
+                                  ar: 'تابع', en: 'Continue'),
                               style: TextStyle(
                                   color: AppColors.primaryDark,
                                   fontWeight: FontWeight.bold,
@@ -1085,13 +1257,17 @@ class LevelSelectorScreen extends StatelessWidget {
                     decoration: BoxDecoration(
                         gradient: AppColors.goldGradient,
                         borderRadius: BorderRadius.circular(20)),
-                    child: const Row(children: [
-                      Text('👑', style: TextStyle(fontSize: 30)),
+                    child: Row(children: [
+                      const Text('👑', style: TextStyle(fontSize: 30)),
                       const SizedBox(width: 12),
                       Expanded(
                           child: Text(
-                              'أكملت جميع المراحل! يمكنك إعادة أي مرحلة.',
-                              style: TextStyle(
+                              AppLocalizations.tr(context,
+                                  ar:
+                                      'أكملت جميع المراحل! يمكنك إعادة أي مرحلة.',
+                                  en:
+                                      'You have completed all levels! You can replay any level.'),
+                              style: const TextStyle(
                                   color: Colors.black,
                                   fontWeight: FontWeight.bold,
                                   fontSize: 13))),
@@ -1174,7 +1350,10 @@ class LevelSelectorScreen extends StatelessWidget {
                                               color: Colors.white, size: 12))),
                               ]),
                               const SizedBox(height: 8),
-                              Text('المرحلة ${lvl.id}',
+                              Text(
+                                  AppLocalizations.tr(context,
+                                      ar: 'المرحلة ${lvl.id}',
+                                      en: 'Level ${lvl.id}'),
                                   style: TextStyle(
                                       color: Colors.white.withOpacity(0.75),
                                       fontSize: 11)),
@@ -1189,17 +1368,30 @@ class LevelSelectorScreen extends StatelessWidget {
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     if (isCurrent)
-                                      _chip('▶ حالية', AppColors.goldColor,
+                                      _chip(
+                                          AppLocalizations.tr(context,
+                                              ar: '▶ حالية', en: '▶ Current'),
+                                          AppColors.goldColor,
                                           Colors.black),
                                     if (completed)
-                                      _chip('✓ مكتملة', AppColors.correctColor,
+                                      _chip(
+                                          AppLocalizations.tr(context,
+                                              ar: '✓ مكتملة',
+                                              en: '✓ Completed'),
+                                          AppColors.correctColor,
                                           Colors.white),
                                     if (!unlocked)
-                                      _chip('مقفلة', Colors.white24,
+                                      _chip(
+                                          AppLocalizations.tr(context,
+                                              ar: 'مقفلة', en: 'Locked'),
+                                          Colors.white24,
                                           Colors.white70),
                                   ]),
                               const SizedBox(height: 4),
-                              Text('${lvl.questions.length} سؤال',
+                              Text(
+                                  AppLocalizations.tr(context,
+                                      ar: '${lvl.questions.length} سؤال',
+                                      en: '${lvl.questions.length} questions'),
                                   style: TextStyle(
                                       color: Colors.white.withOpacity(0.6),
                                       fontSize: 10)),
@@ -1230,7 +1422,9 @@ class LevelSelectorScreen extends StatelessWidget {
 
   void _lockedSnack(BuildContext ctx, QuizLevel lvl) {
     ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
-      content: Text('أكمل المرحلة السابقة لفتح هذه المرحلة '),
+      content: Text(AppLocalizations.tr(ctx,
+          ar: 'أكمل المرحلة السابقة لفتح هذه المرحلة',
+          en: 'Complete the previous level to unlock this one')),
       behavior: SnackBarBehavior.floating,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     ));
@@ -1256,7 +1450,9 @@ class ProgressScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: bg,
-      appBar: _appBar('لوحة التقدم', isDark),
+      appBar: _appBar(
+          AppLocalizations.tr(context, ar: 'لوحة التقدم', en: 'Progress Board'),
+          isDark),
       body: AnimatedBuilder(
         animation: gameState,
         builder: (_, __) => ListView(
@@ -1272,11 +1468,20 @@ class ProgressScreen extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
                       _summaryItem(
-                          '🏆', '${gameState.totalScore}', 'إجمالي النقاط'),
-                      _summaryItem('✅', '${gameState.completedLevels.length}',
-                          'مراحل مكتملة'),
-                      _summaryItem('🔓', '${gameState.unlockedLevels.length}',
-                          'مراحل مفتوحة'),
+                          '🏆',
+                          '${gameState.totalScore}',
+                          AppLocalizations.tr(context,
+                              ar: 'إجمالي النقاط', en: 'Total points')),
+                      _summaryItem(
+                          '✅',
+                          '${gameState.completedLevels.length}',
+                          AppLocalizations.tr(context,
+                              ar: 'مراحل مكتملة', en: 'Completed levels')),
+                      _summaryItem(
+                          '🔓',
+                          '${gameState.unlockedLevels.length}',
+                          AppLocalizations.tr(context,
+                              ar: 'مراحل مفتوحة', en: 'Unlocked levels')),
                     ]),
                 const SizedBox(height: 14),
                 Divider(color: Colors.white.withOpacity(0.25), height: 1),
@@ -1284,7 +1489,10 @@ class ProgressScreen extends StatelessWidget {
                 Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('إجمالي الأسئلة المُجابة',
+                      Text(
+                          AppLocalizations.tr(context,
+                              ar: 'إجمالي الأسئلة المُجابة',
+                              en: 'Total answered questions'),
                           style: TextStyle(
                               color: Colors.white.withOpacity(0.9),
                               fontSize: 12,
@@ -1311,7 +1519,9 @@ class ProgressScreen extends StatelessWidget {
               ]),
             ),
             const SizedBox(height: 20),
-            Text('تفاصيل المراحل',
+            Text(
+                AppLocalizations.tr(context,
+                    ar: 'تفاصيل المراحل', en: 'Level details'),
                 style: TextStyle(
                     color: txt, fontSize: 17, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
@@ -1365,10 +1575,14 @@ class ProgressScreen extends StatelessWidget {
                             const Icon(Icons.check_circle,
                                 color: AppColors.correctColor, size: 18)
                           else if (!unlocked)
-                            Text('مقفلة',
+                            Text(
+                                AppLocalizations.tr(context,
+                                    ar: 'مقفلة', en: 'Locked'),
                                 style: TextStyle(color: sub, fontSize: 10))
                           else if (answeredInLevel > 0)
-                            Text('جارية',
+                            Text(
+                                AppLocalizations.tr(context,
+                                    ar: 'جارية', en: 'In progress'),
                                 style: TextStyle(
                                     color: AppColors.secondaryDark,
                                     fontSize: 10,
@@ -1376,9 +1590,13 @@ class ProgressScreen extends StatelessWidget {
                         ]),
                         const SizedBox(height: 4),
                         Text(
-                            completed
-                                ? '${lvl.questions.length} سؤال'
-                                : '$answeredInLevel / ${lvl.questions.length} سؤال',
+                            AppLocalizations.tr(context,
+                                ar: completed
+                                    ? '${lvl.questions.length} سؤال'
+                                    : '$answeredInLevel / ${lvl.questions.length} سؤال',
+                                en: completed
+                                    ? '${lvl.questions.length} questions'
+                                    : '$answeredInLevel / ${lvl.questions.length} questions'),
                             style: TextStyle(color: sub, fontSize: 11)),
                         const SizedBox(height: 6),
                         ClipRRect(
@@ -1403,13 +1621,17 @@ class ProgressScreen extends StatelessWidget {
                   borderRadius: BorderRadius.circular(14),
                   border:
                       Border.all(color: AppColors.goldColor.withOpacity(0.3))),
-              child: const Row(children: [
-                Text('💡', style: TextStyle(fontSize: 20)),
-                SizedBox(width: 10),
+              child: Row(children: [
+                const Text('💡', style: TextStyle(fontSize: 20)),
+                const SizedBox(width: 10),
                 Expanded(
                     child: Text(
-                        'أكمل المراحل بالتسلسل لفتح مراحل جديدة.\nكل إجابة صحيحة = 10 نقاط',
-                        style: TextStyle(
+                        AppLocalizations.tr(context,
+                            ar:
+                                'أكمل المراحل بالتسلسل لفتح مراحل جديدة.\nكل إجابة صحيحة = 10 نقاط',
+                            en:
+                                'Complete levels in order to unlock new ones.\nEach correct answer = 10 points'),
+                        style: const TextStyle(
                             color: AppColors.textSecDark,
                             fontSize: 12,
                             height: 1.5))),
@@ -1611,8 +1833,10 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   void _use5050() {
     if (_answered || _eliminated.isNotEmpty) return;
     if (!widget.gameState.spendCoins(10)) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('لا تملك عملات كافية 🪙 (تحتاج 10)'),
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(AppLocalizations.tr(context,
+              ar: 'لا تملك عملات كافية 🪙 (تحتاج 10)',
+              en: 'Not enough coins 🪙 (need 10)')),
           behavior: SnackBarBehavior.floating));
       return;
     }
@@ -1629,8 +1853,10 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
     if (_watchingAd) return;
     if (!RewardedAdHelper.isReady) {
       RewardedAdHelper.load();
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('الإعلان غير جاهز بعد، حاول خلال ثوانٍ 🎬'),
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(AppLocalizations.tr(context,
+              ar: 'الإعلان غير جاهز بعد، حاول خلال ثوانٍ 🎬',
+              en: 'Ad is not ready yet, please try again in a few seconds 🎬')),
           behavior: SnackBarBehavior.floating));
       return;
     }
@@ -1639,8 +1865,10 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
       onReward: () {
         widget.gameState.addCoins(10);
         if (mounted)
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-              content: Text('+10 عملات 🪙 شكراً لمشاهدتك!'),
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text(AppLocalizations.tr(context,
+                  ar: '+10 عملات 🪙 شكراً لمشاهدتك!',
+                  en: '+10 coins 🪙 thanks for watching!')),
               behavior: SnackBarBehavior.floating));
       },
       onDismissed: () {
@@ -1860,7 +2088,11 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
       Expanded(
           child: _hintChip(
               icon: Icons.play_circle_outline_rounded,
-              label: _watchingAd ? 'جارٍ التحميل...' : 'مشاهدة إعلان',
+              label: _watchingAd
+                  ? AppLocalizations.tr(context,
+                      ar: 'جارٍ التحميل...', en: 'Loading...')
+                  : AppLocalizations.tr(context,
+                      ar: 'مشاهدة إعلان', en: 'Watch ad'),
               costLabel: '+10 🪙',
               enabled: !_answered && !_watchingAd,
               onTap: _watchAdForCoins,
@@ -1924,7 +2156,10 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
           Text(widget.level.title,
               style: TextStyle(
                   color: _txt, fontSize: 16, fontWeight: FontWeight.bold)),
-          Text('السؤال ${_qIdx + 1} من $_total',
+          Text(
+              AppLocalizations.tr(context,
+                  ar: 'السؤال ${_qIdx + 1} من $_total',
+                  en: 'Question ${_qIdx + 1} of $_total'),
               style: TextStyle(color: widget.level.color, fontSize: 12)),
         ])),
         Container(
@@ -1985,7 +2220,9 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
               Icon(Icons.timer_rounded,
                   size: 14, color: isWarning ? AppColors.wrongColor : _sub),
               const SizedBox(width: 4),
-              Text('$remaining ثانية',
+              Text(
+                  AppLocalizations.tr(context,
+                      ar: '$remaining ثانية', en: '$remaining sec'),
                   style: TextStyle(
                       color: isWarning ? AppColors.wrongColor : _sub,
                       fontSize: 11,
@@ -2054,10 +2291,14 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                     const SizedBox(width: 6),
                     Text(
                         _selected == -1
-                            ? 'انتهى الوقت! ⏰'
+                            ? AppLocalizations.tr(context,
+                                ar: 'انتهى الوقت! ⏰', en: 'Time is up! ⏰')
                             : _selected == _q.correctIndex
-                                ? 'إجابة صحيحة! +10 نقاط'
-                                : 'إجابة خاطئة!',
+                                ? AppLocalizations.tr(context,
+                                    ar: 'إجابة صحيحة! +10 نقاط',
+                                    en: 'Correct answer! +10 points')
+                                : AppLocalizations.tr(context,
+                                    ar: 'إجابة خاطئة!', en: 'Wrong answer!'),
                         style: TextStyle(
                             color: _selected == _q.correctIndex
                                 ? AppColors.correctColor
@@ -2076,7 +2317,8 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                       child: ElevatedButton.icon(
                         onPressed: _retryCurrentQuestion,
                         icon: const Icon(Icons.refresh_rounded, size: 18),
-                        label: const Text('إعادة حل السؤال'),
+                        label: Text(AppLocalizations.tr(context,
+                            ar: 'إعادة حل السؤال', en: 'Retry question')),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primaryDark,
                           foregroundColor: Colors.white,
@@ -2162,7 +2404,11 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                               fontSize: 13)))),
               const SizedBox(width: 12),
               Expanded(
-                  child: Text(isEliminated ? 'تم استبعادها' : _q.options[i],
+                  child: Text(
+                      isEliminated
+                          ? AppLocalizations.tr(context,
+                              ar: 'تم استبعادها', en: 'Eliminated')
+                          : _q.options[i],
                       style: TextStyle(
                           color: isEliminated ? Colors.grey : _txt,
                           fontSize: 14,
@@ -2226,13 +2472,18 @@ class LevelCompleteDialog extends StatelessWidget {
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Text(isPerfect ? '👑' : '🎉', style: const TextStyle(fontSize: 56)),
           const SizedBox(height: 8),
-          Text(isPerfect ? 'أداء مثالي!' : 'أحسنت!',
+          Text(
+              AppLocalizations.tr(context,
+                  ar: isPerfect ? 'أداء مثالي!' : 'أحسنت!',
+                  en: isPerfect ? 'Perfect performance!' : 'Well done!'),
               style: const TextStyle(
                   color: Colors.white,
                   fontSize: 26,
                   fontWeight: FontWeight.bold)),
           const SizedBox(height: 4),
-          Text('انتهيت من $levelTitle',
+          Text(
+              AppLocalizations.tr(context,
+                  ar: 'انتهيت من $levelTitle', en: 'You finished $levelTitle'),
               style: TextStyle(
                   color: Colors.white.withOpacity(0.9), fontSize: 13)),
           const SizedBox(height: 18),
@@ -2243,9 +2494,14 @@ class LevelCompleteDialog extends StatelessWidget {
                 borderRadius: BorderRadius.circular(16)),
             child: Column(children: [
               Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
-                _stat('نقاط المرحلة', '$levelScore'),
-                _stat('الإجمالي', '$totalScore'),
-                _stat('الدقة', '${(pct * 100).toStringAsFixed(0)}%')
+                _stat(
+                    AppLocalizations.tr(context,
+                        ar: 'نقاط المرحلة', en: 'Level points'),
+                    '$levelScore'),
+                _stat(AppLocalizations.tr(context, ar: 'الإجمالي', en: 'Total'),
+                    '$totalScore'),
+                _stat(AppLocalizations.tr(context, ar: 'الدقة', en: 'Accuracy'),
+                    '${(pct * 100).toStringAsFixed(0)}%')
               ]),
               const SizedBox(height: 10),
               ClipRRect(
@@ -2260,15 +2516,18 @@ class LevelCompleteDialog extends StatelessWidget {
           const SizedBox(height: 18),
           Row(children: [
             Expanded(
-                child: _btn(Icons.replay_rounded, 'إعادة',
+                child: _btn(Icons.replay_rounded,
+                    AppLocalizations.tr(context, ar: 'إعادة', en: 'Retry'),
                     outlined: true, onTap: onRetry)),
             const SizedBox(width: 8),
             Expanded(
-                child: _btn(Icons.home_rounded, 'الرئيسية',
+                child: _btn(Icons.home_rounded,
+                    AppLocalizations.tr(context, ar: 'الرئيسية', en: 'Home'),
                     outlined: true, onTap: onHome)),
             const SizedBox(width: 8),
             Expanded(
-                child: _btn(Icons.arrow_forward_rounded, 'التالية',
+                child: _btn(Icons.arrow_forward_rounded,
+                    AppLocalizations.tr(context, ar: 'التالية', en: 'Next'),
                     outlined: false, onTap: onNext)),
           ]),
         ]),
@@ -2321,7 +2580,9 @@ class PrivacyPolicyScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: _appBar(
-          'سياسة الخصوصية', Theme.of(context).brightness == Brightness.dark),
+          AppLocalizations.tr(context,
+              ar: 'سياسة الخصوصية', en: 'Privacy Policy'),
+          Theme.of(context).brightness == Brightness.dark),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -2331,37 +2592,77 @@ class PrivacyPolicyScreen extends StatelessWidget {
               decoration: BoxDecoration(
                   gradient: AppColors.primaryGradient,
                   borderRadius: BorderRadius.circular(22)),
-              child: const Column(children: [
-                Text('🔒', style: TextStyle(fontSize: 44)),
-                SizedBox(height: 8),
-                Text('سياسة الخصوصية',
+              child: Column(children: [
+                const Text('🔒', style: TextStyle(fontSize: 44)),
+                const SizedBox(height: 8),
+                Text(
+                    AppLocalizations.tr(context,
+                        ar: 'سياسة الخصوصية', en: 'Privacy Policy'),
                     style: TextStyle(
                         color: Colors.white,
                         fontSize: 22,
                         fontWeight: FontWeight.bold)),
-                SizedBox(height: 4),
-                Text('آخر تحديث: يوليو 2026',
-                    style: TextStyle(color: Colors.white70, fontSize: 12)),
+                const SizedBox(height: 4),
+                Text(
+                    AppLocalizations.tr(context,
+                        ar: 'آخر تحديث: يوليو 2026',
+                        en: 'Last updated: July 2026'),
+                    style:
+                        const TextStyle(color: Colors.white70, fontSize: 12)),
               ])),
           const SizedBox(height: 22),
-          _section('1. المقدمة',
-              'مرحباً بكم في تطبيق "لعبة الأسئلة". نحن ملتزمون بحماية خصوصيتكم. توضح هذه السياسة كيفية جمعنا للمعلومات واستخدامها وحمايتها.'),
-          _section('2. البيانات التي نحفظها',
-              'التطبيق يحفظ البيانات التالية محلياً على جهازك فقط:\n• إجمالي النقاط المكتسبة\n• رقم المرحلة الحالية\n• قائمة المراحل المفتوحة والمكتملة\n• تفضيل الوضع الداكن أو الفاتح\nلا نجمع أي بيانات شخصية كالاسم أو البريد الإلكتروني أو الموقع الجغرافي.'),
-          _section('3. استخدام البيانات',
-              'البيانات المحفوظة تُستخدم حصرياً لـ:\n• حفظ تقدمك في اللعبة وعدم فقده\n• عرض النقاط والمراحل المفتوحة\n• تذكّر تفضيلات العرض\nلا تُشارك هذه البيانات مع أي طرف ثالث إطلاقاً.'),
-          _section('4. الإعلانات',
-              'يستخدم التطبيق خدمة إعلانات Google AdMob لعرض إعلانات (بانر، إعلانات بينية، إعلانات مكافأة، وإعلانات شاشة فتح) داخل التطبيق لدعم استمراريته مجاناً. قد تقوم Google بجمع معرّف الجهاز الإعلاني ومعلومات تقنية أخرى وفق سياسة خصوصية Google الخاصة بالإعلانات.'),
-          _section('5. أمان البيانات',
-              'بيانات تقدمك محفوظة على جهازك فقط باستخدام SharedPreferences ولا يُرسَل أي شيء منها إلى خوادمنا. يمكنك حذف جميع بياناتك في أي وقت عبر "إعادة ضبط" في الشاشة الرئيسية.'),
-          _section('6. حقوقك',
-              'لديك الحق الكامل في:\n• الاطلاع على بياناتك المحفوظة\n• حذفها في أي وقت تشاء\n• إيقاف استخدام التطبيق'),
-          _section('7. الأطفال',
-              'تطبيقنا مناسب لجميع الأعمار. لا نجمع أي بيانات خاصة بالأطفال دون موافقة ولي الأمر.'),
-          _section('8. التعديلات',
-              'قد نحدّث هذه السياسة من وقت لآخر. سيتم إخطارك بأي تغييرات جوهرية عند تحديث التطبيق.'),
-          _section('9. تواصل معنا',
-              'لأي استفسار حول سياسة الخصوصية:\n📧 support@quizgame.app\n🌐 www.quizgame.app'),
+          _section(
+              AppLocalizations.tr(context,
+                  ar: '1. المقدمة', en: '1. Introduction'),
+              AppLocalizations.tr(context,
+                  ar: 'مرحباً بكم في تطبيق "لعبة الأسئلة". نحن ملتزمون بحماية خصوصيتكم. توضح هذه السياسة كيفية جمعنا للمعلومات واستخدامها وحمايتها.',
+                  en: 'Welcome to the Quiz Game app. We are committed to protecting your privacy. This policy explains how we collect, use, and protect information.')),
+          _section(
+              AppLocalizations.tr(context,
+                  ar: '2. البيانات التي نحفظها', en: '2. Data we keep'),
+              AppLocalizations.tr(context,
+                  ar: 'التطبيق يحفظ البيانات التالية محلياً على جهازك فقط:\n• إجمالي النقاط المكتسبة\n• رقم المرحلة الحالية\n• قائمة المراحل المفتوحة والمكتملة\n• تفضيل الوضع الداكن أو الفاتح\nلا نجمع أي بيانات شخصية كالاسم أو البريد الإلكتروني أو الموقع الجغرافي.',
+                  en: 'The app stores the following data locally on your device only:\n• Total points earned\n• Current level number\n• List of unlocked and completed levels\n• Dark/light theme preference\nWe do not collect personal data like name, email, or location.')),
+          _section(
+              AppLocalizations.tr(context,
+                  ar: '3. استخدام البيانات', en: '3. Data use'),
+              AppLocalizations.tr(context,
+                  ar: 'البيانات المحفوظة تُستخدم حصرياً لـ:\n• حفظ تقدمك في اللعبة وعدم فقده\n• عرض النقاط والمراحل المفتوحة\n• تذكّر تفضيلات العرض\nلا تُشارك هذه البيانات مع أي طرف ثالث إطلاقاً.',
+                  en: 'Saved data is used only to:\n• keep your game progress\n• display points and unlocked levels\n• remember display preferences\nThis data is never shared with third parties.')),
+          _section(
+              AppLocalizations.tr(context, ar: '4. الإعلانات', en: '4. Ads'),
+              AppLocalizations.tr(context,
+                  ar: 'يستخدم التطبيق خدمة إعلانات Google AdMob لعرض إعلانات (بانر، إعلانات بينية، إعلانات مكافأة، وإعلانات شاشة فتح) داخل التطبيق لدعم استمراريته مجاناً. قد تقوم Google بجمع معرّف الجهاز الإعلاني ومعلومات تقنية أخرى وفق سياسة خصوصية Google الخاصة بالإعلانات.',
+                  en: 'The app uses Google AdMob to show ads (banner, interstitial, rewarded, and app open ads) to support the free experience. Google may collect advertising device identifiers and technical data according to its ads privacy policy.')),
+          _section(
+              AppLocalizations.tr(context,
+                  ar: '5. أمان البيانات', en: '5. Data security'),
+              AppLocalizations.tr(context,
+                  ar: 'بيانات تقدمك محفوظة على جهازك فقط باستخدام SharedPreferences ولا يُرسَل أي شيء منها إلى خوادمنا. يمكنك حذف جميع بياناتك في أي وقت عبر "إعادة ضبط" في الشاشة الرئيسية.',
+                  en: 'Your progress data is stored only on your device using SharedPreferences and is not sent to our servers. You can delete all data at any time using the Reset option on the home screen.')),
+          _section(
+              AppLocalizations.tr(context,
+                  ar: '6. حقوقك', en: '6. Your rights'),
+              AppLocalizations.tr(context,
+                  ar: 'لديك الحق الكامل في:\n• الاطلاع على بياناتك المحفوظة\n• حذفها في أي وقت تشاء\n• إيقاف استخدام التطبيق',
+                  en: 'You have the right to:\n• view your stored data\n• delete it at any time\n• stop using the app')),
+          _section(
+              AppLocalizations.tr(context, ar: '7. الأطفال', en: '7. Children'),
+              AppLocalizations.tr(context,
+                  ar: 'تطبيقنا مناسب لجميع الأعمار. لا نجمع أي بيانات خاصة بالأطفال دون موافقة ولي الأمر.',
+                  en: 'Our app is suitable for all ages. We do not collect any data about children without parental consent.')),
+          _section(
+              AppLocalizations.tr(context,
+                  ar: '8. التعديلات', en: '8. Changes'),
+              AppLocalizations.tr(context,
+                  ar: 'قد نحدّث هذه السياسة من وقت لآخر. سيتم إخطارك بأي تغييرات جوهرية عند تحديث التطبيق.',
+                  en: 'We may update this policy from time to time. You will be notified of any material changes when the app updates.')),
+          _section(
+              AppLocalizations.tr(context,
+                  ar: '9. تواصل معنا', en: '9. Contact us'),
+              AppLocalizations.tr(context,
+                  ar: 'لأي استفسار حول سياسة الخصوصية:\n📧 support@quizgame.app\n🌐 www.quizgame.app',
+                  en: 'For any privacy questions:\n📧 support@quizgame.app\n🌐 www.quizgame.app')),
           const SizedBox(height: 16),
           Container(
               padding: const EdgeInsets.all(16),
@@ -2370,10 +2671,12 @@ class PrivacyPolicyScreen extends StatelessWidget {
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
                       color: AppColors.primaryDark.withOpacity(0.50))),
-              child: const Text(
-                  'باستخدامك للتطبيق فأنت توافق على هذه السياسة. إن لم تكن موافقاً يرجى التوقف عن الاستخدام.',
+              child: Text(
+                  AppLocalizations.tr(context,
+                      ar: 'باستخدامك للتطبيق فأنت توافق على هذه السياسة. إن لم تكن موافقاً يرجى التوقف عن الاستخدام.',
+                      en: 'By using the app, you agree to this policy. If you do not agree, please stop using the app.'),
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 14, height: 1.6))),
+                  style: const TextStyle(fontSize: 14, height: 1.6))),
           const SizedBox(height: 30),
         ]),
       ),

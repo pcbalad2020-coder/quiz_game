@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
@@ -50,13 +51,16 @@ class AdManager {
   static String nativeAdUnitIdForPlatform({required bool isIOS}) =>
       isIOS ? _testNativeAdUnitId : _productionNativeAdUnitId;
 
-  static String get bannerAdUnitId => bannerAdUnitIdForPlatform(isIOS: true);
+  static bool get _isIOS => Platform.isIOS;
+
+  static String get bannerAdUnitId => bannerAdUnitIdForPlatform(isIOS: _isIOS);
   static String get interstitialAdUnitId =>
-      interstitialAdUnitIdForPlatform(isIOS: true);
+      interstitialAdUnitIdForPlatform(isIOS: _isIOS);
   static String get rewardedAdUnitId =>
-      rewardedAdUnitIdForPlatform(isIOS: true);
-  static String get appOpenAdUnitId => appOpenAdUnitIdForPlatform(isIOS: true);
-  static String get nativeAdUnitId => nativeAdUnitIdForPlatform(isIOS: true);
+      rewardedAdUnitIdForPlatform(isIOS: _isIOS);
+  static String get appOpenAdUnitId =>
+      appOpenAdUnitIdForPlatform(isIOS: _isIOS);
+  static String get nativeAdUnitId => nativeAdUnitIdForPlatform(isIOS: _isIOS);
 
   // ----------------------------------------------------------
   // 1️⃣ الإعلان البيني (Interstitial)

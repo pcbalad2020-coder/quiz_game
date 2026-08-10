@@ -63,7 +63,7 @@ void main() async {
     statusBarIconBrightness: Brightness.light,
   ));
 
-  await MobileAds.instance.initialize();
+  await AdConsentManager.instance.requestConsentAndInitialize();
   runApp(const QuizApp());
 }
 
@@ -697,12 +697,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _loadBanner();
   }
 
-  void _loadBanner() {
-    _bannerAd = AdManager.instance.createBannerAd(
+  Future<void> _loadBanner() async {
+    final width = MediaQuery.of(context).size.width.truncate();
+    final ad = await AdManager.instance.createAdaptiveBannerAd(
+      width: width,
       onLoaded: () {
         if (mounted) setState(() => _bannerReady = true);
       },
     );
+    if (mounted) {
+      _bannerAd = ad;
+    } else {
+      ad?.dispose();
+    }
   }
 
   @override
@@ -1745,12 +1752,19 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
     _restoreProgressThenStart();
   }
 
-  void _loadBanner() {
-    _bannerAd = AdManager.instance.createBannerAd(
+  Future<void> _loadBanner() async {
+    final width = MediaQuery.of(context).size.width.truncate();
+    final ad = await AdManager.instance.createAdaptiveBannerAd(
+      width: width,
       onLoaded: () {
         if (mounted) setState(() => _bannerReady = true);
       },
     );
+    if (mounted) {
+      _bannerAd = ad;
+    } else {
+      ad?.dispose();
+    }
   }
 
   Future<void> _restoreProgressThenStart() async {

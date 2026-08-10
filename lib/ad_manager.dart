@@ -1,6 +1,69 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+
+// ============================================================
+// 🛡️ إدارة موافقة المستخدم (UMP) قبل تهيئة الإعلانات
+// مطلوبة من Google لضمان تقديم الإعلانات بشكل صحيح (خصوصاً
+// لمستخدمي أوروبا/بريطانيا)، وقد يؤدي غيابها إلى تقييد أو
+// تقليل عدد الإعلانات الحقيقية التي تُعرض.
+// ============================================================
+class AdConsentManager {
+  AdConsentManager._();
+  static final AdConsentManager instance = AdConsentManager._();
+
+  Future<void> requestConsentAndInitialize() async {
+    final completer = Completer<void>();
+    final params = ConsentRequestParameters();
+
+    ConsentInformation.instance.requestConsentInfoUpdate(
+      params,
+      () async {
+        try {
+          if (await ConsentInformation.instance.isConsentFormAvailable()) {
+            await _loadAndShowConsentFormIfRequired();
+          }
+        } catch (e) {
+          debugPrint('⚠️ خطأ في نموذج الموافقة: $e');
+        } finally {
+          if (!completer.isCompleted) completer.complete();
+        }
+      },
+      (FormError error) {
+        debugPrint('⚠️ فشل تحديث معلومات الموافقة: ${error.message}');
+        if (!completer.isCompleted) completer.complete();
+      },
+    );
+
+    // مهلة أمان: لا نريد تعطيل بدء التطبيق إذا تأخر خادم الموافقة
+    await completer.future.timeout(
+      const Duration(seconds: 4),
+      onTimeout: () {},
+    );
+    await MobileAds.instance.initialize();
+  }
+
+  Future<void> _loadAndShowConsentFormIfRequired() {
+    final completer = Completer<void>();
+    ConsentForm.loadConsentForm(
+      (ConsentForm form) async {
+        final status = await ConsentInformation.instance.getConsentStatus();
+        if (status == ConsentStatus.required) {
+          form.show((FormError? error) {
+            if (!completer.isCompleted) completer.complete();
+          });
+        } else {
+          if (!completer.isCompleted) completer.complete();
+        }
+      },
+      (FormError error) {
+        if (!completer.isCompleted) completer.complete();
+      },
+    );
+    return completer.future;
+  }
+}
 
 // ============================================================
 // 📌 مدير الإعلانات المركزي (AdManager)
@@ -108,26 +171,35 @@ class AdManager {
   }
 
   // ----------------------------------------------------------
-  // 2️⃣ إعلان البانر (Banner)
+  // 2️⃣ إعلان البانر (Banner) — تكيفي (Adaptive)
   // ----------------------------------------------------------
-  BannerAd createBannerAd(
-      {VoidCallback? onLoaded, Function(LoadAdError)? onFailed}) {
-    return BannerAd(
+  // بانر تكيفي (Adaptive Banner) — حجم يتناسب مع عرض الشاشة
+  // ويحقق نسبة تعبئة (fill rate) وعائد أعلى من البانر الثابت.
+  Future<BannerAd?> createAdaptiveBannerAd(
+      {required int width,
+      VoidCallback? onLoaded,
+      Function(LoadAdError)? onFailed}) async {
+    final size =
+        await AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(width);
+    if (size == null) return null;
+    final ad = BannerAd(
       adUnitId: bannerAdUnitId,
-      size: AdSize.banner,
+      size: size,
       request: const AdRequest(),
       listener: BannerAdListener(
         onAdLoaded: (ad) {
-          debugPrint('✅ تم تحميل البانر');
+          debugPrint('✅ تم تحميل البانر التكيفي');
           onLoaded?.call();
         },
         onAdFailedToLoad: (ad, error) {
-          debugPrint('❌ فشل تحميل البانر: $error');
+          debugPrint('❌ فشل تحميل البانر التكيفي: $error');
           ad.dispose();
           onFailed?.call(error);
         },
       ),
-    )..load();
+    );
+    await ad.load();
+    return ad;
   }
 
   // ----------------------------------------------------------

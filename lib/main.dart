@@ -7,6 +7,7 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 // استيراد ملفاتك الأخرى
 import 'quiz_data.dart';
 import 'ad_manager.dart'; // ✅ استيراد ملف الإعلانات المنفصل
+import 'notification_service.dart'; // ✅ إشعارات التذكير اليومية
 
 class AppLocalizations {
   final Locale locale;
@@ -64,6 +65,10 @@ void main() async {
   ));
 
   await AdConsentManager.instance.requestConsentAndInitialize();
+
+  // ✅ تفعيل إشعارات التذكير اليومية (١ ظهراً و٨ مساءً) دون تعطيل بدء التطبيق
+  ReminderNotificationService.instance.init();
+
   runApp(const QuizApp());
 }
 

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
@@ -99,20 +100,51 @@ class AdManager {
   static const String _testNativeAdUnitId =
       'ca-app-pub-3940256099942544/2247696110';
 
-  static String bannerAdUnitIdForPlatform({required bool isIOS}) =>
-      isIOS ? _testBannerAdUnitId : _productionBannerAdUnitId;
+  static bool _useTestAdUnits({
+    required bool isIOS,
+    required bool isRelease,
+  }) =>
+      isIOS || !isRelease;
 
-  static String interstitialAdUnitIdForPlatform({required bool isIOS}) =>
-      isIOS ? _testInterstitialAdUnitId : _productionInterstitialAdUnitId;
+  static String bannerAdUnitIdForPlatform({
+    required bool isIOS,
+    bool isRelease = kReleaseMode,
+  }) =>
+      _useTestAdUnits(isIOS: isIOS, isRelease: isRelease)
+          ? _testBannerAdUnitId
+          : _productionBannerAdUnitId;
 
-  static String rewardedAdUnitIdForPlatform({required bool isIOS}) =>
-      isIOS ? _testRewardedAdUnitId : _productionRewardedAdUnitId;
+  static String interstitialAdUnitIdForPlatform({
+    required bool isIOS,
+    bool isRelease = kReleaseMode,
+  }) =>
+      _useTestAdUnits(isIOS: isIOS, isRelease: isRelease)
+          ? _testInterstitialAdUnitId
+          : _productionInterstitialAdUnitId;
 
-  static String appOpenAdUnitIdForPlatform({required bool isIOS}) =>
-      isIOS ? _testAppOpenAdUnitId : _productionAppOpenAdUnitId;
+  static String rewardedAdUnitIdForPlatform({
+    required bool isIOS,
+    bool isRelease = kReleaseMode,
+  }) =>
+      _useTestAdUnits(isIOS: isIOS, isRelease: isRelease)
+          ? _testRewardedAdUnitId
+          : _productionRewardedAdUnitId;
 
-  static String nativeAdUnitIdForPlatform({required bool isIOS}) =>
-      isIOS ? _testNativeAdUnitId : _productionNativeAdUnitId;
+  static String appOpenAdUnitIdForPlatform({
+    required bool isIOS,
+    bool isRelease = kReleaseMode,
+  }) =>
+      _useTestAdUnits(isIOS: isIOS, isRelease: isRelease)
+          ? _testAppOpenAdUnitId
+          : _productionAppOpenAdUnitId;
+
+  static String nativeAdUnitIdForPlatform({
+    required bool isIOS,
+    bool isRelease = kReleaseMode,
+  }) =>
+      _useTestAdUnits(isIOS: isIOS, isRelease: isRelease)
+          ? _testNativeAdUnitId
+          : _productionNativeAdUnitId;
 
   static bool get _isIOS => Platform.isIOS;
 

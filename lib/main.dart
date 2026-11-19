@@ -586,10 +586,10 @@ class _SplashScreenState extends State<SplashScreen>
                       width: 130,
                       height: 130,
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.15),
+                        color: Colors.white.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(36),
                         border: Border.all(color: Colors.white30, width: 2),
-                        boxShadow: [
+                        boxShadow: const [
                           BoxShadow(
                               color: Colors.black38,
                               blurRadius: 24,
@@ -610,7 +610,7 @@ class _SplashScreenState extends State<SplashScreen>
                       AppLocalizations.tr(context,
                           ar: 'لعبة الأسئلة', en: 'Quiz Game'),
                       textAlign: TextAlign.center,
-                      style: TextStyle(
+                      style: const TextStyle(
                           color: Colors.white,
                           fontSize: 38,
                           fontWeight: FontWeight.bold,
@@ -624,7 +624,8 @@ class _SplashScreenState extends State<SplashScreen>
                               'Test your knowledge in ${QuizData.levels.length} levels'),
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                          color: Colors.white.withOpacity(0.8), fontSize: 15)),
+                          color: Colors.white.withValues(alpha: 0.8),
+                          fontSize: 15)),
                   const SizedBox(height: 6),
                   Text(
                       AppLocalizations.tr(context,
@@ -634,7 +635,8 @@ class _SplashScreenState extends State<SplashScreen>
                               '${QuizData.levels.fold(0, (s, l) => s + l.questions.length)} diverse questions'),
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                          color: Colors.white.withOpacity(0.65), fontSize: 13)),
+                          color: Colors.white.withValues(alpha: 0.65),
+                          fontSize: 13)),
                 ]),
               ),
               const Spacer(flex: 2),
@@ -658,7 +660,7 @@ class _SplashScreenState extends State<SplashScreen>
                   AppLocalizations.tr(context,
                       ar: 'جارٍ التحميل...', en: 'Loading...'),
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white70, fontSize: 12)),
+                  style: const TextStyle(color: Colors.white70, fontSize: 12)),
               const SizedBox(height: 32),
             ],
           ),
@@ -777,7 +779,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                 '${widget.gameState.unlockedLevels.length} open levels of ${QuizData.levels.length}'),
                         gradient: LinearGradient(colors: [
                           AppColors.secondaryDark,
-                          AppColors.secondaryDark.withOpacity(0.7)
+                          AppColors.secondaryDark.withValues(alpha: 0.7)
                         ]),
                         onTap: _openLevels),
                     const SizedBox(height: 14),
@@ -860,7 +862,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     color: _card, borderRadius: BorderRadius.circular(12)),
                 child: Text(
                   widget.gameState.languageCode == 'ar' ? 'EN' : 'عربي',
-                  style: TextStyle(
+                  style: const TextStyle(
                       color: AppColors.primaryDark,
                       fontWeight: FontWeight.bold,
                       fontSize: 12),
@@ -893,7 +895,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           borderRadius: BorderRadius.circular(26),
           boxShadow: [
             BoxShadow(
-                color: AppColors.primaryDark.withOpacity(0.45),
+                color: AppColors.primaryDark.withValues(alpha: 0.45),
                 blurRadius: 22,
                 offset: const Offset(0, 8))
           ],
@@ -906,7 +908,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 AppLocalizations.tr(context,
                     ar: 'إجمالي نقاطك', en: 'Total Score'),
                 style: TextStyle(
-                    color: Colors.white.withOpacity(0.9), fontSize: 15)),
+                    color: Colors.white.withValues(alpha: 0.9), fontSize: 15)),
           ]),
           const SizedBox(height: 8),
           Text('${widget.gameState.totalScore}',
@@ -919,7 +921,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
             decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.18),
+                color: Colors.white.withValues(alpha: 0.18),
                 borderRadius: BorderRadius.circular(20)),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
               const Text('🪙', style: TextStyle(fontSize: 14)),
@@ -934,7 +936,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       fontWeight: FontWeight.bold)),
             ]),
           ),
-          Divider(color: Colors.white.withOpacity(0.25), height: 24),
+          Divider(color: Colors.white.withValues(alpha: 0.25), height: 24),
           Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
             _scoreStat(
                 '📊',
@@ -964,8 +966,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 fontSize: 18,
                 fontWeight: FontWeight.bold)),
         Text(label,
-            style:
-                TextStyle(color: Colors.white.withOpacity(0.75), fontSize: 10)),
+            style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.75), fontSize: 10)),
       ]);
 
   Widget _buildQuickStats() {
@@ -987,7 +989,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               AppLocalizations.tr(context,
                   ar: '$answered / $total سؤال',
                   en: '$answered / $total questions'),
-              style: TextStyle(
+              style: const TextStyle(
                   color: AppColors.primaryDark,
                   fontSize: 12,
                   fontWeight: FontWeight.bold)),
@@ -998,7 +1000,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           child: LinearProgressIndicator(
             value: pct,
             minHeight: 8,
-            backgroundColor: AppColors.primaryDark.withOpacity(0.15),
+            backgroundColor: AppColors.primaryDark.withValues(alpha: 0.15),
             valueColor: const AlwaysStoppedAnimation(AppColors.primaryDark),
           ),
         ),
@@ -1027,7 +1029,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                  color: gradient.colors.first.withOpacity(0.35),
+                  color: gradient.colors.first.withValues(alpha: 0.35),
                   blurRadius: 14,
                   offset: const Offset(0, 5))
             ],
@@ -1037,7 +1039,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(14)),
                 child: Icon(icon, color: Colors.white, size: 24)),
             const SizedBox(width: 14),
@@ -1052,10 +1054,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           fontWeight: FontWeight.bold)),
                   Text(subtitle,
                       style: TextStyle(
-                          color: Colors.white.withOpacity(0.8), fontSize: 12)),
+                          color: Colors.white.withValues(alpha: 0.8),
+                          fontSize: 12)),
                 ])),
             Icon(Icons.arrow_forward_ios_rounded,
-                color: Colors.white.withOpacity(0.7), size: 16),
+                color: Colors.white.withValues(alpha: 0.7), size: 16),
           ]),
         ),
       );
@@ -1067,9 +1070,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 13),
           decoration: BoxDecoration(
-              color: color.withOpacity(0.12),
+              color: color.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: color.withOpacity(0.3))),
+              border: Border.all(color: color.withValues(alpha: 0.3))),
           child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
             Icon(ic, color: color, size: 17),
             const SizedBox(width: 7),
@@ -1155,7 +1158,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                  color: AppColors.primaryDark.withOpacity(0.1),
+                  color: AppColors.primaryDark.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12)),
               child: Text(
                   AppLocalizations.tr(context,
@@ -1217,7 +1220,8 @@ class LevelSelectorScreen extends StatelessWidget {
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: [
                         BoxShadow(
-                            color: AppColors.primaryDark.withOpacity(0.35),
+                            color:
+                                AppColors.primaryDark.withValues(alpha: 0.35),
                             blurRadius: 16,
                             offset: const Offset(0, 6))
                       ],
@@ -1227,7 +1231,7 @@ class LevelSelectorScreen extends StatelessWidget {
                           width: 52,
                           height: 52,
                           decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
+                              color: Colors.white.withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(14)),
                           child: Center(
                               child: Text(resumeLevel.icon,
@@ -1247,7 +1251,7 @@ class LevelSelectorScreen extends StatelessWidget {
                                     fontWeight: FontWeight.w600)),
                             Text(resumeLevel.title,
                                 style: TextStyle(
-                                    color: Colors.white.withOpacity(0.85),
+                                    color: Colors.white.withValues(alpha: 0.85),
                                     fontSize: 15,
                                     fontWeight: FontWeight.bold)),
                           ])),
@@ -1270,7 +1274,7 @@ class LevelSelectorScreen extends StatelessWidget {
                           child: Text(
                               AppLocalizations.tr(context,
                                   ar: 'تابع', en: 'Continue'),
-                              style: TextStyle(
+                              style: const TextStyle(
                                   color: AppColors.primaryDark,
                                   fontWeight: FontWeight.bold,
                                   fontSize: 13)),
@@ -1332,7 +1336,7 @@ class LevelSelectorScreen extends StatelessWidget {
                                 ? LinearGradient(
                                     colors: [
                                         lvl.color,
-                                        lvl.color.withOpacity(0.65)
+                                        lvl.color.withValues(alpha: 0.65)
                                       ],
                                     begin: Alignment.topLeft,
                                     end: Alignment.bottomRight)
@@ -1346,7 +1350,7 @@ class LevelSelectorScreen extends StatelessWidget {
                             boxShadow: [
                               BoxShadow(
                                   color: (unlocked ? lvl.color : Colors.black)
-                                      .withOpacity(0.3),
+                                      .withValues(alpha: 0.3),
                                   blurRadius: 12,
                                   offset: const Offset(0, 4))
                             ],
@@ -1362,7 +1366,8 @@ class LevelSelectorScreen extends StatelessWidget {
                                   Container(
                                       width: 50,
                                       height: 50,
-                                      color: Colors.black.withOpacity(0.45),
+                                      color:
+                                          Colors.black.withValues(alpha: 0.45),
                                       child: const Icon(Icons.lock_rounded,
                                           color: Colors.white70, size: 26)),
                                 if (completed)
@@ -1383,7 +1388,8 @@ class LevelSelectorScreen extends StatelessWidget {
                                       ar: 'المرحلة ${lvl.id}',
                                       en: 'Level ${lvl.id}'),
                                   style: TextStyle(
-                                      color: Colors.white.withOpacity(0.75),
+                                      color:
+                                          Colors.white.withValues(alpha: 0.75),
                                       fontSize: 11)),
                               Text(lvl.title,
                                   textAlign: TextAlign.center,
@@ -1421,7 +1427,8 @@ class LevelSelectorScreen extends StatelessWidget {
                                       ar: '${lvl.questions.length} سؤال',
                                       en: '${lvl.questions.length} questions'),
                                   style: TextStyle(
-                                      color: Colors.white.withOpacity(0.6),
+                                      color:
+                                          Colors.white.withValues(alpha: 0.6),
                                       fontSize: 10)),
                             ],
                           ),
@@ -1512,7 +1519,7 @@ class ProgressScreen extends StatelessWidget {
                               ar: 'مراحل مفتوحة', en: 'Unlocked levels')),
                     ]),
                 const SizedBox(height: 14),
-                Divider(color: Colors.white.withOpacity(0.25), height: 1),
+                Divider(color: Colors.white.withValues(alpha: 0.25), height: 1),
                 const SizedBox(height: 14),
                 Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1522,7 +1529,7 @@ class ProgressScreen extends StatelessWidget {
                               ar: 'إجمالي الأسئلة المُجابة',
                               en: 'Total answered questions'),
                           style: TextStyle(
-                              color: Colors.white.withOpacity(0.9),
+                              color: Colors.white.withValues(alpha: 0.9),
                               fontSize: 12,
                               fontWeight: FontWeight.w600)),
                       Text(
@@ -1571,10 +1578,10 @@ class ProgressScreen extends StatelessWidget {
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
                       color: completed
-                          ? AppColors.correctColor.withOpacity(0.5)
+                          ? AppColors.correctColor.withValues(alpha: 0.5)
                           : unlocked
-                              ? lvl.color.withOpacity(0.3)
-                              : Colors.grey.withOpacity(0.2)),
+                              ? lvl.color.withValues(alpha: 0.3)
+                              : Colors.grey.withValues(alpha: 0.2)),
                 ),
                 child: Row(children: [
                   Container(
@@ -1582,7 +1589,7 @@ class ProgressScreen extends StatelessWidget {
                       height: 48,
                       decoration: BoxDecoration(
                           color: (unlocked ? lvl.color : Colors.grey)
-                              .withOpacity(0.15),
+                              .withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(12)),
                       child: Center(
                           child: Text(unlocked ? lvl.icon : '🔒',
@@ -1611,7 +1618,7 @@ class ProgressScreen extends StatelessWidget {
                             Text(
                                 AppLocalizations.tr(context,
                                     ar: 'جارية', en: 'In progress'),
-                                style: TextStyle(
+                                style: const TextStyle(
                                     color: AppColors.secondaryDark,
                                     fontSize: 10,
                                     fontWeight: FontWeight.bold)),
@@ -1632,7 +1639,7 @@ class ProgressScreen extends StatelessWidget {
                           child: LinearProgressIndicator(
                             value: progress,
                             minHeight: 4,
-                            backgroundColor: Colors.grey.withOpacity(0.2),
+                            backgroundColor: Colors.grey.withValues(alpha: 0.2),
                             valueColor: AlwaysStoppedAnimation(
                                 completed ? AppColors.correctColor : lvl.color),
                           ),
@@ -1645,10 +1652,10 @@ class ProgressScreen extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                  color: AppColors.goldColor.withOpacity(0.1),
+                  color: AppColors.goldColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(14),
-                  border:
-                      Border.all(color: AppColors.goldColor.withOpacity(0.3))),
+                  border: Border.all(
+                      color: AppColors.goldColor.withValues(alpha: 0.3))),
               child: Row(children: [
                 const Text('💡', style: TextStyle(fontSize: 20)),
                 const SizedBox(width: 10),
@@ -1681,8 +1688,8 @@ class ProgressScreen extends StatelessWidget {
                 fontSize: 22,
                 fontWeight: FontWeight.bold)),
         Text(label,
-            style:
-                TextStyle(color: Colors.white.withOpacity(0.75), fontSize: 10)),
+            style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.75), fontSize: 10)),
       ]);
 }
 
@@ -1742,12 +1749,12 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   late final AnimationController _timerCtrl =
       AnimationController(vsync: this, duration: const Duration(seconds: 25))
         ..addStatusListener(_onTimerDone);
-  late Animation<double> _qFade = Tween<double>(begin: 0.0, end: 1.0)
+  late final Animation<double> _qFade = Tween<double>(begin: 0.0, end: 1.0)
       .animate(CurvedAnimation(parent: _qCtrl, curve: Curves.easeIn));
-  late Animation<Offset> _qSlide =
+  late final Animation<Offset> _qSlide =
       Tween<Offset>(begin: const Offset(0.4, 0), end: Offset.zero)
           .animate(CurvedAnimation(parent: _qCtrl, curve: Curves.easeOutCubic));
-  late Animation<double> _resScale = Tween<double>(begin: 0.6, end: 1.0)
+  late final Animation<double> _resScale = Tween<double>(begin: 0.6, end: 1.0)
       .animate(CurvedAnimation(parent: _resCtrl, curve: Curves.elasticOut));
 
   @override
@@ -1899,12 +1906,13 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
     RewardedAdHelper.show(
       onReward: () {
         widget.gameState.addCoins(10);
-        if (mounted)
+        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
               content: Text(AppLocalizations.tr(context,
                   ar: '+10 عملات 🪙 شكراً لمشاهدتك!',
                   en: '+10 coins 🪙 thanks for watching!')),
               behavior: SnackBarBehavior.floating));
+        }
       },
       onDismissed: () {
         if (mounted) setState(() => _watchingAd = false);
@@ -2089,7 +2097,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                       ? AppColors.correctColor
                       : isCurrent
                           ? widget.level.color
-                          : Colors.grey.withOpacity(0.2),
+                          : Colors.grey.withValues(alpha: 0.2),
             ),
             child: Center(
               child: Text(
@@ -2148,10 +2156,11 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
         decoration: BoxDecoration(
-            color: (enabled ? color : Colors.grey).withOpacity(0.12),
+            color: (enabled ? color : Colors.grey).withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
-                color: (enabled ? color : Colors.grey).withOpacity(0.35))),
+                color:
+                    (enabled ? color : Colors.grey).withValues(alpha: 0.35))),
         child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
           Icon(icon, size: 16, color: enabled ? color : Colors.grey),
           const SizedBox(width: 6),
@@ -2179,7 +2188,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
           child: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                  color: widget.level.color.withOpacity(0.15),
+                  color: widget.level.color.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(12)),
               child: Icon(Icons.arrow_back_ios_rounded,
                   color: widget.level.color, size: 18)),
@@ -2215,10 +2224,10 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
         Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
-                color: AppColors.secondaryDark.withOpacity(0.15),
+                color: AppColors.secondaryDark.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                    color: AppColors.secondaryDark.withOpacity(0.4))),
+                    color: AppColors.secondaryDark.withValues(alpha: 0.4))),
             child: Row(children: [
               const Text('🪙', style: TextStyle(fontSize: 12)),
               const SizedBox(width: 4),
@@ -2236,7 +2245,8 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                   child: LinearProgressIndicator(
                       value: (_qIdx + 1) / _total,
                       minHeight: 6,
-                      backgroundColor: widget.level.color.withOpacity(0.15),
+                      backgroundColor:
+                          widget.level.color.withValues(alpha: 0.15),
                       valueColor: AlwaysStoppedAnimation(widget.level.color)))),
           const SizedBox(width: 10),
           Text('${((_qIdx + 1) / _total * 100).toStringAsFixed(0)}%',
@@ -2270,7 +2280,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                       child: LinearProgressIndicator(
                           value: 1 - _timerCtrl.value,
                           minHeight: 4,
-                          backgroundColor: Colors.grey.withOpacity(0.2),
+                          backgroundColor: Colors.grey.withValues(alpha: 0.2),
                           valueColor: AlwaysStoppedAnimation(isWarning
                               ? AppColors.wrongColor
                               : AppColors.secondaryDark)))),
@@ -2286,10 +2296,10 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
             color: _card,
             borderRadius: BorderRadius.circular(24),
             border: Border.all(
-                color: widget.level.color.withOpacity(0.3), width: 1.5),
+                color: widget.level.color.withValues(alpha: 0.3), width: 1.5),
             boxShadow: [
               BoxShadow(
-                  color: widget.level.color.withOpacity(0.08),
+                  color: widget.level.color.withValues(alpha: 0.08),
                   blurRadius: 18,
                   spreadRadius: 2)
             ]),
@@ -2313,7 +2323,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                     color: (_selected == _q.correctIndex
                             ? AppColors.correctColor
                             : AppColors.wrongColor)
-                        .withOpacity(0.12),
+                        .withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
                         color: _selected == _q.correctIndex
@@ -2381,19 +2391,19 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
       Color borderColor;
       Color bgColor;
       if (isEliminated) {
-        borderColor = Colors.grey.withOpacity(0.15);
-        bgColor = Colors.grey.withOpacity(0.06);
+        borderColor = Colors.grey.withValues(alpha: 0.15);
+        bgColor = Colors.grey.withValues(alpha: 0.06);
       } else if (!_answered) {
-        borderColor = AppColors.primaryDark.withOpacity(0.35);
-        bgColor = AppColors.primaryDark.withOpacity(0.08);
+        borderColor = AppColors.primaryDark.withValues(alpha: 0.35);
+        bgColor = AppColors.primaryDark.withValues(alpha: 0.08);
       } else if (isCorrect) {
         borderColor = AppColors.correctColor;
-        bgColor = AppColors.correctColor.withOpacity(0.12);
+        bgColor = AppColors.correctColor.withValues(alpha: 0.12);
       } else if (isWrong) {
         borderColor = AppColors.wrongColor;
-        bgColor = AppColors.wrongColor.withOpacity(0.12);
+        bgColor = AppColors.wrongColor.withValues(alpha: 0.12);
       } else {
-        borderColor = Colors.grey.withOpacity(0.25);
+        borderColor = Colors.grey.withValues(alpha: 0.25);
         bgColor = Colors.transparent;
       }
 
@@ -2412,7 +2422,8 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                 boxShadow: isSelected
                     ? [
                         BoxShadow(
-                            color: borderColor.withOpacity(0.25), blurRadius: 8)
+                            color: borderColor.withValues(alpha: 0.25),
+                            blurRadius: 8)
                       ]
                     : null),
             child: Row(children: [
@@ -2424,8 +2435,8 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                           ? AppColors.correctColor
                           : (_answered && isWrong)
                               ? AppColors.wrongColor
-                              : AppColors.primaryDark
-                                  .withOpacity(isEliminated ? 0.06 : 0.15),
+                              : AppColors.primaryDark.withValues(
+                                  alpha: isEliminated ? 0.06 : 0.15),
                       borderRadius: BorderRadius.circular(8)),
                   child: Center(
                       child: Text(String.fromCharCode(0x0041 + i),
@@ -2520,12 +2531,12 @@ class LevelCompleteDialog extends StatelessWidget {
               AppLocalizations.tr(context,
                   ar: 'انتهيت من $levelTitle', en: 'You finished $levelTitle'),
               style: TextStyle(
-                  color: Colors.white.withOpacity(0.9), fontSize: 13)),
+                  color: Colors.white.withValues(alpha: 0.9), fontSize: 13)),
           const SizedBox(height: 18),
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
+                color: Colors.white.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(16)),
             child: Column(children: [
               Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
@@ -2577,8 +2588,8 @@ class LevelCompleteDialog extends StatelessWidget {
                 fontSize: 20,
                 fontWeight: FontWeight.bold)),
         Text(label,
-            style:
-                TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 10)),
+            style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.8), fontSize: 10)),
       ]);
 
   Widget _btn(IconData ic, String label,
@@ -2588,7 +2599,8 @@ class LevelCompleteDialog extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 11),
           decoration: BoxDecoration(
-              color: outlined ? Colors.white.withOpacity(0.2) : Colors.white,
+              color:
+                  outlined ? Colors.white.withValues(alpha: 0.2) : Colors.white,
               borderRadius: BorderRadius.circular(12),
               border: outlined ? Border.all(color: Colors.white54) : null),
           child: Column(children: [
@@ -2633,7 +2645,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
                 Text(
                     AppLocalizations.tr(context,
                         ar: 'سياسة الخصوصية', en: 'Privacy Policy'),
-                    style: TextStyle(
+                    style: const TextStyle(
                         color: Colors.white,
                         fontSize: 22,
                         fontWeight: FontWeight.bold)),
@@ -2702,10 +2714,10 @@ class PrivacyPolicyScreen extends StatelessWidget {
           Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                  color: AppColors.primaryDark.withOpacity(0.18),
+                  color: AppColors.primaryDark.withValues(alpha: 0.18),
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
-                      color: AppColors.primaryDark.withOpacity(0.50))),
+                      color: AppColors.primaryDark.withValues(alpha: 0.50))),
               child: Text(
                   AppLocalizations.tr(context,
                       ar: 'باستخدامك للتطبيق فأنت توافق على هذه السياسة. إن لم تكن موافقاً يرجى التوقف عن الاستخدام.',
